@@ -1,0 +1,35 @@
+# Grid Guardian — Local Sensor Configuration
+# ============================================
+# Pass this file via --sensors-config to data_collection.py
+# Only used when --include-local-sensors is set.
+
+# PZEM-004T sensor (RS485 via USB-RS485 adapter)
+pzem:
+  enabled: false
+  port: COM3               # Serial port (Windows) or /dev/ttyUSB0 (Linux)
+  baud: 9600               # Baud rate (default for PZEM-004T)
+  address: 0x01            # Modbus slave address
+  mapping: pv              # 'pv' → maps power reading to pv_gen_kw
+                           # 'load' → maps power reading to load_kw
+
+# INA219 / INA226 sensor (I2C)
+ina:
+  enabled: false
+  bus: 1                   # I2C bus number (Raspberry Pi default = 1)
+  address: "0x40"          # I2C address (default INA219 = 0x40)
+  shunt_ohms: 0.1          # Shunt resistor value in Ohms
+  mapping: pv              # 'pv' → maps to pv_gen_kw; 'load' → maps to load_kw
+
+# Additional sensors can be added here following the same pattern.
+# Each sensor block needs:
+#   enabled: true/false
+#   mapping: 'pv' or 'load' (determines which output column receives the power reading)
+#   Connection-specific fields (port, address, etc.)
+
+# Example: second PZEM for load measurement
+# pzem_load:
+#   enabled: false
+#   port: COM4
+#   baud: 9600
+#   address: 0x02
+#   mapping: load

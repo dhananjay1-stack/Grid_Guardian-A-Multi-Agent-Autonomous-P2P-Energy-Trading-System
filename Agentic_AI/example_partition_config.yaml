@@ -1,0 +1,74 @@
+# ============================================================================
+# example_partition_config.yaml — Grid Guardian Dataset Partition Config
+# ============================================================================
+# Used by dataset_partition.py (Step 1 — Validate and Partition the Dataset)
+
+general:
+  seed: 42
+  timestep_min: 5
+  tz: "Asia/Kolkata"
+  chunk_size: 10000             # rows per streaming chunk
+  parse_failure_threshold: 0.005  # abort if >0.5% parse failures
+
+splitting:
+  strategy: time_forward        # time_forward | block_hierarchy | episode_random | kfold_ts
+  val_span_days: 14
+  test_span_days: 30
+  min_event_count: 2            # min occurrences of each rare event in test
+  train_ratio: 0.7              # only used for episode_random / block_hierarchy
+  val_ratio: 0.15
+  test_ratio: 0.15
+  kfold_k: 5                   # for kfold_ts strategy
+
+imputation:
+  method: interpolate           # drop | interpolate | model | flag
+  gap_fill_limit_minutes: 30
+  required_columns:             # rows with these missing after imputation → drop
+    - pv_gen_kw
+    - load_kw
+    - net_kw
+    - soc_kwh
+    - actual_irradiance_wm2
+
+outliers:
+  method: iqr                   # iqr | zscore | mad
+  iqr_factor: 3.0               # wider factor for energy data
+  zscore_threshold: 4.0
+  mad_threshold: 5.0
+  winsorize: false              # if true, clip outliers to bounds
+
+thresholds:
+  max_missing_fraction: 0.05    # per-column warning threshold
+
+# Physical range bounds per column (min, max)
+feature_ranges:
+  pv_gen_kw:              [0.0, 15.0]
+  load_kw:                [0.0, 20.0]
+  net_kw:                 [-20.0, 15.0]
+  soc_kwh:                [0.0, 15.0]
+  soc_capacity_kwh:       [0.0, 20.0]
+  battery_power_kw:       [-10.0, 10.0]
+  price_signal:           [0.0, 50.0]
+  forecast_irradiance_1h: [0.0, 1500.0]
+  forecast_irradiance_3h: [0.0, 1500.0]
+  forecast_temp_1h:       [-60.0, 60.0]
+  actual_irradiance_wm2:  [0.0, 1500.0]
+  voltage_v:              [100.0, 500.0]
+  current_a:              [0.0, 200.0]
+  offered_kwh:            [0.0, 10.0]
+  offer_price:            [0.0, 50.0]
+  reward:                 [-100.0, 100.0]
+
+# Action-space coverage checks
+action_checks:
+  min_rows_per_household: 1000
+  min_offer_fraction_per_household: 0.001  # at least 0.1% rows should have offers
+
+# Drift detection
+drift:
+  window_size_days: 30
+  ks_alpha: 0.05
+  features:
+    - actual_irradiance_wm2
+    - pv_gen_kw
+    - load_kw

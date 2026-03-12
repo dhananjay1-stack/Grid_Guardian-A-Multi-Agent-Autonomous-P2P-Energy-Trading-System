@@ -1,0 +1,28 @@
+{
+  "seed": 42,
+  "strategy": "time_forward",
+  "config_hash": "ef0d1506cf80ed50ce85c38aa7aef518736c6e906e98b93e734aa3fa6eefd7c2",
+  "git_commit": null,
+  "python_version": "3.12.0 (tags/v3.12.0:0fb18b0, Oct  2 2023, 13:03:39) [MSC v.1935 64 bit (AMD64)]",
+  "run_utc": "2026-03-02T08:46:27.829510+00:00",
+  "cli_args": {
+    "input": "./data/final/final_dataset.csv.gz",
+    "collected": null,
+    "config": "./example_partition_config.yaml",
+    "out_dir": "./data/partitioned",
+    "timestep": 5,
+    "tz": "Asia/Kolkata",
+    "seed": 42,
+    "strategy": "time_forward",
+    "val_span_days": 14,
+    "test_span_days": 30,
+    "min_event_count": 2,
+    "impute_method": "interpolate",
+    "outlier_method": "iqr",
+    "max_missing_threshold": 0.05,
+    "chunk_size": 10000,
+    "visualize": true,
+    "dry_run": false,
+    "strict": false
+  }
+}

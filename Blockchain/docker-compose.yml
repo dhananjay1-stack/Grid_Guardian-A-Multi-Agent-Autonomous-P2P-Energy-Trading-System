@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL for off-chain KYC / identity registry ──
+  postgres:
+    image: postgres:15-alpine
+    container_name: gg-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: gridguardian
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./offchain-registry/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Local IPFS node for metaURI storage ──
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: gg-ipfs
+    restart: unless-stopped
+    ports:
+      - "5001:5001"   # API
+      - "8080:8080"   # Gateway
+    volumes:
+      - ipfs_data:/data/ipfs
+    healthcheck:
+      test: ["CMD-SHELL", "ipfs dag stat /ipfs/QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:
+  ipfs_data:

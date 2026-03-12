@@ -1,0 +1,20 @@
+{
+  "input_file": "data\\final\\final_dataset.csv.gz",
+  "file_size_bytes": 3194346,
+  "sha256": "867c76bd6cb4653f0ab2ce8dbec53db8c87ba70104984f80d1634dee388dd811",
+  "row_count": 77760,
+  "column_count": 25,
+  "canonical_columns_present": true,
+  "extra_columns": [
+    "voltage_v_synth_flag",
+    "current_a_synth_flag"
+  ],
+  "first_ts": "2025-01-01 00:00:00+00:00",
+  "last_ts": "2025-03-31 23:55:00+00:00",
+  "households": [
+    "ev_owner_01",
+    "family_home_01",
+    "small_apartment_01"
+  ],
+  "created_utc": "2026-03-02T08:45:33.089253+00:00"
+}

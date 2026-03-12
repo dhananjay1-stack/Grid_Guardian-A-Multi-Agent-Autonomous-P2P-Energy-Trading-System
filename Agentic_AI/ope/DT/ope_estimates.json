@@ -1,0 +1,18 @@
+{
+  "IS": {
+    "method": "IS",
+    "estimate": 0.0,
+    "mean": 0.0,
+    "ci_lower": 0.0,
+    "ci_upper": 0.0,
+    "n_episodes": 1
+  },
+  "WIS": {
+    "method": "WIS",
+    "estimate": 0.0,
+    "mean": 0.0,
+    "ci_lower": 0.0,
+    "ci_upper": 0.0,
+    "n_episodes": 1
+  }
+}

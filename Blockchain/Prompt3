@@ -1,0 +1,345 @@
+**Step 3: Local Sensing → Offer Creation (off-chain commit & signature)**.
+It assumes Step 1 & Step 2 are done (your Prompt2 status image shows Step2 complete) and runs in the same VSCode + Hardhat repo. It includes exact contract APIs, Pi client code, commit/reveal flow, security rules, tests, VSCode tasks and a verification checklist.
+
+---
+
+# Prompt: Implement Local Sensing → Offer Creation (end-to-end, VSCode, Pi + TradingSC)
+
+You are implementing Step 3 (Local sensing → offer creation) for Grid-Guardian. Deliverables:
+
+* `contracts/TradingSC.sol` (commit storage + optional reveal path, compact gas-efficient layout)
+* `pi-client/` scripts: `compose_offer.js`, `sign_offer.js`, `publish_commit_onchain.js`, `broadcast_offer_p2p.js`, and `reveal_offer.js` (reveal optional)
+* Off-chain P2P bulletin example (libp2p or MQTT) to broadcast full offers locally
+* Tests: unit tests for TradingSC (commit stored, reveal verifies, rejects expired or invalid reveals) and integration script simulating a Pi commit → off-chain broadcast → reveal
+* VSCode tasks for quick dev loop
+* Security checklist, operational guidance (buckets, nonces, salt handling, timings, anti-spam)
+
+Work in the same repo layout as prompt 1/2.
+
+---
+
+## Why this flow + design decisions (short)
+
+* Use **quantized buckets** (kWh and price buckets) to reduce privacy leakage and gas cost.
+* Use **commit–reveal** (commit = keccak(offer_hash|salt)) to keep private telemetry/salts off-chain until reveal.
+* Use **EIP-712** typed signing of the structured offer (or of `offer_hash`) so signatures are unambiguous and replay-protected.
+* Store only compact metadata and commit_hash on-chain; reveal (offer_data + salt) only when needed (reveal window).
+* Provide off-chain P2P for low-latency local matching and optional on-chain commit for auditability.
+
+---
+
+## Repository additions (files & locations)
+
+```
+grid-guardian/
+├─ contracts/
+│  └─ TradingSC.sol
+├─ pi-client/
+│  └─ compose_offer.js
+│  └─ sign_offer.js
+│  └─ publish_commit_onchain.js
+│  └─ broadcast_offer_p2p.js
+│  └─ reveal_offer.js
+├─ relayer/        # reuses relayer from Step2
+├─ tests/
+│  └─ trading.test.js
+├─ scripts/
+│  └─ simulate_pi_commit_reveal.js
+├─ .vscode/tasks.json
+```
+
+---
+
+## Offer structure & quantization rules (recommended)
+
+* `round_id` — monotonic market round integer (use chain block windows or server clock anchor)
+* `node_id_hash` — bytes32 node id derived in Step1
+* `offered_kwh_bucket` — small integer code representing quantized quantity (e.g., bucket 1 = 0.1–0.5 kWh, bucket 2 = 0.5–1.0)
+* `price_bucket` — small integer price bucket (e.g., cents increments or buckets)
+* `nonce` — uint32 monotonic per-node (prevents replay)
+* `expiry_block` — block number after which reveal not allowed
+
+Compose the offer payload as a deterministic ABI-encoding for hashing:
+`abi.encodePacked(round_id, node_id_hash, offered_kwh_bucket, price_bucket, nonce, expiry_block)`
+
+---
+
+## On-chain contract: `TradingSC.sol` (minimal, gas-efficient)
+
+Save as `contracts/TradingSC.sol`. Comments included.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.27;
+
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
+contract TradingSC {
+    using ECDSA for bytes32;
+
+    // compact commit struct (keeps storage minimal)
+    struct Commit {
+        address owner;      // signer address (from IdentitySC)
+        uint32 roundId;     // fits in 32 bits
+        uint32 expiryBlock; // fits in 32 bits
+        bool revealed;      // 1 byte
+        // commitHash is used as mapping key (keccak256(offerHash | salt))
+    }
+
+    // commitHash => Commit
+    mapping(bytes32 => Commit) public commits;
+
+    // event
+    event CommitPosted(bytes32 indexed commitHash, address indexed owner, uint32 roundId, uint32 expiryBlock);
+    event OfferRevealed(bytes32 indexed commitHash, bytes32 offerHash, bytes saltHash); // saltHash optional for audit
+
+    // post a commit on chain
+    // sig = signature of offerHash (EIP-191/EIP-712) or offer author signature
+    function postCommit(bytes32 commitHash, bytes32 offerHash, uint32 roundId, uint32 expiryBlock, bytes calldata sig) external {
+        require(commits[commitHash].owner == address(0), "commit exists");
+
+        // recover signer from offerHash signature
+        address signer = _recoverSigner(offerHash, sig);
+        require(signer != address(0), "invalid sig");
+
+        // save commit; owner = signer
+        commits[commitHash] = Commit({owner: signer, roundId: roundId, expiryBlock: expiryBlock, revealed: false});
+        emit CommitPosted(commitHash, signer, roundId, expiryBlock);
+    }
+
+    // reveal: provide offerHash and salt, verify keccak(offerHash | salt) == commitHash
+    // optional: saltHash to avoid revealing raw salt on-chain (but on reveal you must reveal salt)
+    function revealOffer(bytes32 commitHash, bytes32 offerHash, bytes calldata salt) external {
+        Commit storage c = commits[commitHash];
+        require(c.owner != address(0), "no commit");
+        require(!c.revealed, "already revealed");
+        require(block.number <= c.expiryBlock, "commit expired for reveal");
+
+        // verify commit integrity
+        bytes32 computed = keccak256(abi.encodePacked(offerHash, salt));
+        require(computed == commitHash, "mismatch commit");
+
+        // optional: verify offerHash signer again? skip since postCommit checked signature
+        // mark revealed
+        c.revealed = true;
+
+        emit OfferRevealed(commitHash, offerHash, keccak256(salt));
+    }
+
+    // helper to recover signer from offerHash signature (ECDSA)
+    function _recoverSigner(bytes32 offerHash, bytes memory sig) internal pure returns (address) {
+        // assume offerHash is the keccak256 of ABI-encoded offer struct; standardized signing (EIP-191) may be used
+        // Best: use EIP-712 domain outside; here we'll treat offerHash as already domain-separated
+        return ECDSA.recover(offerHash, sig);
+    }
+
+    // view helpers
+    function isCommitRevealed(bytes32 commitHash) external view returns (bool) {
+        return commits[commitHash].revealed;
+    }
+}
+```
+
+**Notes / improvements**
+
+* For EIP-712, you may prefer to recover signer using `_hashTypedDataV4` in a more complete contract (requires EIP-712 implementation). The example above assumes `offerHash` is the domain-separated hash returned by the Pi signer.
+* To save gas, commit is keyed by `commitHash` (32 bytes) and stores only the minimal metadata.
+
+---
+
+## Pi client flow & example scripts (Node.js)
+
+Create `pi-client/compose_offer.js` — deterministic composition & hashing:
+
+```js
+// compose_offer.js
+const ethers = require('ethers');
+
+// quantization map is project-specific; keep it small
+function composeOffer(roundId, nodeIdHex, kwhBucket, priceBucket, nonce, expiryBlock) {
+  // pack values same way Solidity does: abi.encodePacked
+  const abi = ethers.utils.defaultAbiCoder;
+  const packed = ethers.utils.solidityPack(
+    ['uint32','bytes32','uint16','uint16','uint32','uint32'],
+    [roundId, nodeIdHex, kwhBucket, priceBucket, nonce, expiryBlock]
+  );
+  const offerHash = ethers.utils.keccak256(packed);
+  return { packed, offerHash };
+}
+module.exports = { composeOffer };
+```
+
+Create `pi-client/sign_offer.js` — EIP-712 typed signing or sign `offerHash` directly:
+
+```js
+// sign_offer.js
+const { ethers } = require('ethers');
+async function signOfferHash(wallet, offerHash) {
+  // OPTION A: if wallet._signTypedData used, compute typedData domain & types
+  // Simpler: sign the 32-byte offerHash directly (ensure domain separation in production)
+  const sig = await wallet.signMessage(ethers.utils.arrayify(offerHash)); // EIP-191
+  return sig;
+}
+module.exports = { signOfferHash };
+```
+
+Create `pi-client/publish_commit_onchain.js` — posts commit via relayer or directly:
+
+```js
+// publish_commit_onchain.js
+const { ethers } = require('ethers');
+const TradingSC_ABI = require('../artifacts/contracts/TradingSC.sol/TradingSC.json').abi;
+
+async function postCommit(provider, contractAddress, commitHash, offerHash, roundId, expiryBlock, sig) {
+  const signer = provider.getSigner(); // or relayer should call this
+  const contract = new ethers.Contract(contractAddress, TradingSC_ABI, signer);
+  const tx = await contract.postCommit(commitHash, offerHash, roundId, expiryBlock, sig);
+  return tx.wait();
+}
+module.exports = { postCommit };
+```
+
+Create `pi-client/broadcast_offer_p2p.js` — off-chain P2P stub (libp2p example or MQTT):
+
+```js
+// broadcast_offer_p2p.js (very basic publish skeleton)
+async function broadcastOfferP2P(offerJson, options) {
+  // Use libp2p or MQTT; for dev you can POST to a local gossip service or write into local folder
+  // Example: publish via MQTT
+  // const mqtt = require('mqtt'); const client = mqtt.connect(options.url);
+  // client.publish('gridguardian/offers', JSON.stringify(offerJson));
+  console.log("Broadcasting offer off-chain (dev):", JSON.stringify(offerJson));
+}
+module.exports = { broadcastOfferP2P };
+```
+
+Create `pi-client/reveal_offer.js` — reveal salt when required:
+
+```js
+// reveal_offer.js
+const { ethers } = require('ethers');
+const TradingSC_ABI = require('../artifacts/contracts/TradingSC.sol/TradingSC.json').abi;
+
+async function reveal(provider, contractAddr, commitHash, offerHash, salt) {
+  const signer = provider.getSigner();
+  const contract = new ethers.Contract(contractAddr, TradingSC_ABI, signer);
+  const tx = await contract.revealOffer(commitHash, offerHash, salt);
+  return tx.wait();
+}
+module.exports = { reveal };
+```
+
+**Salt storage**
+
+* Store salt in device path: `/home/pi/.gridguardian/salts/<commitHash>.salt` with POSIX mode `0o600`.
+* Never upload salt to any untrusted server. Salt is revealed only in reveal window or to trusted provers.
+
+---
+
+## Example dev script: integrate the steps (simulate Pi)
+
+`scripts/simulate_pi_commit_reveal.js` — does compose → sign → compute commit → postCommit (using relayer/public signer) → optional reveal.
+
+(Use provider from Hardhat, and a wallet for Pi when running tests.)
+
+---
+
+## EIP-712 recommendation (production)
+
+* Prefer full EIP-712 typed data signing for `Offer` struct (domain = GridGuardian Trading, chainId, verifyingContract). This allows on-chain `_hashTypedDataV4` recovery and robust signature semantics.
+* Example types:
+
+```js
+const domain = { name: "GridGuardian-Trading", version: "1", chainId, verifyingContract: TRADING_SC_ADDR };
+const types = { Offer: [
+  { name: 'roundId', type: 'uint32' },
+  { name: 'nodeId', type: 'bytes32' },
+  { name: 'kwhBucket', type: 'uint16' },
+  { name: 'priceBucket', type: 'uint16' },
+  { name: 'nonce', type: 'uint32' },
+  { name: 'expiryBlock', type: 'uint32' }
+]};
+```
+
+* Signers call `wallet._signTypedData(domain, types, message)` and the contract should use EIP-712 library to recover signer.
+
+---
+
+## Tests (Hardhat/Mocha)
+
+Create `tests/trading.test.js` covering:
+
+1. `postCommit` stores commit, emits `CommitPosted` and owner recovered equals signer
+2. `postCommit` rejects duplicate commitHash
+3. `revealOffer` accepts valid reveal only before expiry and owner matches prior signer
+4. `revealOffer` rejects mismatched commitHash/offerHash/salt or expired block
+5. Replay tests: attempt to reveal twice or post commit with wrong signature
+6. Integration test: simulate Pi compose/sign → postCommit → off-chain broadcast simulated → reveal
+
+Run:
+
+```bash
+npx hardhat test tests/trading.test.js
+```
+
+---
+
+## VSCode tasks (examples to add to `.vscode/tasks.json`)
+
+* Start Hardhat node
+* Deploy TradingSC
+* Run simulate script (simulate_pi_commit_reveal.js)
+* Run tests
+
+---
+
+## Security, privacy & anti-abuse checklist
+
+* Quantize into buckets (do not store raw kWh/price on chain). ✔
+* Use monotonic per-node `nonce` included in the offer and verified during reveal. ✔
+* Enforce `expiry_block` to bound reveal window and prevent indefinite withholding. ✔
+* Salt storage: POSIX `600` and optionally encrypt salt at rest. Do not back it up. ✔
+* Prevent commit spam: require minimal collateral stake before `postCommit` accepted (check with `CollateralSC.deposits(nodeId) >= minDeposit`). Implement in `postCommit` the call to `CollateralSC` or have TradingSC check via `ICollateralSC` interface. ✔
+* Anti-front-run: commit approach prevents a front-runner seeing offer content before reveal; still define reveal windows and stake slashing for no-reveal. ✔
+* Timestamp & ordering: prefer block-based `roundId` or require server signed round anchor to mitigate local clock skew. ✔
+* Signature domain separation: always use domain separation (EIP-712 or prefix) to avoid signature reuse. ✔
+
+---
+
+## Operational notes & best practices
+
+* Use small bucket tables stored in repo (human readable) explaining bucket → actual kWh/price range.
+* For local matching, off-chain gossip (libp2p) should carry the full offer (without salt) — only participants in the local cluster see it.
+* If optimizing privacy further, consider submitting only `offerHash` and let optimizer request reveals only for accepted matches.
+* Provide an indexer that listens to `CommitPosted` events and builds an off-chain orderbook (for optimizer). Indexer should NOT store salts.
+* In pilots, use short rounds (e.g., 5–15 min) so reveals and settlements happen quickly.
+
+---
+
+## Verification checklist (what to confirm)
+
+* [ ] TradingSC compiled and deployed to devnet.
+* [ ] Pi script composes deterministic `offerHash` matching contract expectation (ABI packing parity).
+* [ ] Pi signs offerHash (EIP-712 or signMessage) and relayer/provider recovers signer → owner.
+* [ ] `postCommit(commitHash, offerHash, roundId, expiryBlock, sig)` successfully emits `CommitPosted`.
+* [ ] Commit stored under `commits[commitHash]` with correct `owner` and `roundId`.
+* [ ] `revealOffer(commitHash, offerHash, salt)` checks `keccak(offerHash|salt)==commitHash` and marks `revealed`.
+* [ ] Reveal rejected after `expiry_block` and for mismatched salt.
+* [ ] Integration test simulating off-chain P2P broadcast logs the offer and `CommitPosted` exists on chain.
+* [ ] VSCode tasks can run full simulate script (compose → sign → postCommit → reveal).
+* [ ] Salt files exist locally with POSIX `600` permissions and are never uploaded to external servers.
+
+---
+
+## Deliverables (what to commit / PR)
+
+1. `contracts/TradingSC.sol` with NatSpec & tests.
+2. `pi-client` scripts listed above with clear README usage.
+3. `scripts/simulate_pi_commit_reveal.js` integration scenario.
+4. `tests/trading.test.js` unit + integration tests.
+5. `README.md` section documenting buckets, domain details (EIP-712 domain), and security notes.
+6. VSCode tasks/launch configs to run the flow end-to-end.
+
+---
+
+

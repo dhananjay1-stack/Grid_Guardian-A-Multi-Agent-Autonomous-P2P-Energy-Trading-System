@@ -1,0 +1,14 @@
+# ──────────────────────────────────────────────────────────────────
+# Grid-Guardian RL — Raspberry Pi 5 (ARM64) Edge Dockerfile
+# ──────────────────────────────────────────────────────────────────
+FROM python:3.10-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir numpy torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir onnxruntime
+
+COPY edge/ ./edge/
+COPY model_packaging/ ./model_packaging/
+
+CMD ["python", "edge/edge_inference.py", "--help"]

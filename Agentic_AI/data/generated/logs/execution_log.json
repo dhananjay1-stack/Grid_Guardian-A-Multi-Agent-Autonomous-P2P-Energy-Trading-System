@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-02-27T19:52:34.661409+00:00",
+  "args": {
+    "collected": "./data/collected/collected_data.csv.gz",
+    "config": "generator_config.yaml",
+    "out": "./data/generated",
+    "timestep": null,
+    "start": null,
+    "end": null,
+    "seed": 42,
+    "compute_reward": true,
+    "format": "csv",
+    "chunk_size": 1440,
+    "encrypt_salts": false,
+    "dry_run": false
+  },
+  "rows": 77760,
+  "offers": 8407,
+  "trades": 10
+}

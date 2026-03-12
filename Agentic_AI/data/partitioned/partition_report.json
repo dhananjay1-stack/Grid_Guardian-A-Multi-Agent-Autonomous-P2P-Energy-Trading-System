@@ -1,0 +1,122 @@
+{
+  "header_check": {
+    "status": "PASS",
+    "rows": 77760
+  },
+  "parse_check": {
+    "status": "PASS",
+    "parse_failures": 0,
+    "failure_rate": 0.0,
+    "household_index": {
+      "ev_owner_01": {
+        "rows": 25920,
+        "earliest_ts": "2025-01-01 00:00:00+00:00",
+        "latest_ts": "2025-03-31 23:55:00+00:00"
+      },
+      "family_home_01": {
+        "rows": 25920,
+        "earliest_ts": "2025-01-01 00:00:00+00:00",
+        "latest_ts": "2025-03-31 23:55:00+00:00"
+      },
+      "small_apartment_01": {
+        "rows": 25920,
+        "earliest_ts": "2025-01-01 00:00:00+00:00",
+        "latest_ts": "2025-03-31 23:55:00+00:00"
+      }
+    }
+  },
+  "missingness": {
+    "status": "WARN",
+    "review_required_columns": [
+      "offer_id",
+      "offered_kwh",
+      "offer_price",
+      "trade_id",
+      "commit_hash"
+    ],
+    "total_missing_cells": 344401
+  },
+  "imputation": {
+    "status": "PASS",
+    "method": "interpolate",
+    "missing_before": 134016,
+    "missing_after": 126256,
+    "filled": 7760
+  },
+  "range_violations": "none",
+  "feature_checks": {
+    "status": "PASS",
+    "range_violations": 0,
+    "outlier_groups": 5
+  },
+  "coverage": {
+    "status": "PASS",
+    "household_stats": {
+      "ev_owner_01": {
+        "rows": 25920,
+        "offers": 5896,
+        "offer_fraction": 0.2275,
+        "battery_charge_rows": 5620,
+        "battery_discharge_rows": 10417
+      },
+      "family_home_01": {
+        "rows": 25920,
+        "offers": 2511,
+        "offer_fraction": 0.0969,
+        "battery_charge_rows": 6000,
+        "battery_discharge_rows": 6518
+      },
+      "small_apartment_01": {
+        "rows": 25920,
+        "offers": 2761,
+        "offer_fraction": 0.1065,
+        "battery_charge_rows": 5923,
+        "battery_discharge_rows": 3445
+      }
+    },
+    "event_counts": {
+      "normal": 77671,
+      "cloud_ramp": 51,
+      "ev_arrival": 33,
+      "grid_outage": 5
+    },
+    "warnings": []
+  },
+  "drift": {
+    "status": "WARN",
+    "features_checked": 3,
+    "drift_detected_count": 2,
+    "recommendation": "time-based splitting recommended"
+  },
+  "split": {
+    "status": "PASS",
+    "strategy": "time_forward",
+    "counts": {
+      "train": 39741,
+      "test": 25923,
+      "val": 12096
+    },
+    "per_split_event_counts": {
+      "train": {
+        "normal": 39696,
+        "cloud_ramp": 24,
+        "ev_arrival": 20,
+        "grid_outage": 1
+      },
+      "val": {
+        "normal": 12077,
+        "cloud_ramp": 10,
+        "ev_arrival": 8,
+        "grid_outage": 1
+      },
+      "test": {
+        "normal": 25898,
+        "cloud_ramp": 17,
+        "ev_arrival": 5,
+        "grid_outage": 3
+      }
+    },
+    "adjustments": []
+  },
+  "no_overlap": true
+}

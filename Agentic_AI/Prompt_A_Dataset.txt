@@ -1,0 +1,226 @@
+# Prompt  — **Data-Collection Script** (produces `collected_data.csv.gz`)
+
+> **Goal (one line):**
+> Build `data_collection.py` which downloads/ingests weather and irradiance data for a location and timeframe, optionally reads local meter sensors, normalizes & resamples everything to a configurable timestep (default 5 min), validates & documents data quality, and writes `collected_data.csv.gz` + `collected_metadata.json` ready to be consumed by the Data-Generation script.
+
+---
+
+## Required behavior & constraints (must implement)
+
+### 1) CLI / config interface
+
+Script must support both CLI args and a YAML/JSON config file. Required CLI args:
+
+```
+--lat <float>
+--lon <float>
+--start <YYYY-MM-DD>
+--end <YYYY-MM-DD>
+--timestep <int>        # minutes, default 5; allowed values: 1,5,15,60
+--source <string>      # 'nasa_power' (default) | 'era5'
+--include-local-sensors  # optional flag to read PZEM/INA sensors
+--out <path>           # output folder, default ./data/collected
+--format <csv|parquet> # output format, default csv (gzipped)
+--seed <int>           # deterministic behavior for interpolation/noise
+--tz <tz_string>       # local timezone, default 'Asia/Kolkata'
+--dry-run              # run validations only, no output
+```
+
+Also accept `--config config.yaml` that can contain the above settings.
+
+---
+
+### 2) Primary data sources & API usage
+
+Implement two fetch modes:
+
+**A. NASA POWER (default, easiest)**
+
+* Use NASA POWER Hourly Point API: `https://power.larc.nasa.gov/api/temporal/hourly/point`
+* Request at minimum these parameters:
+
+  * `ALLSKY_SFC_SW_DWN` → `actual_irradiance_wm2` (W/m²)
+  * `T2M` → `temperature_C` (°C)
+  * `WS` or `WS2M` → `wind_speed_m_s` (m/s)
+  * `CLD` or cloud_frac if available → `cloud_cover_percent` (0–100)
+* Build the exact query string and store it in metadata.
+
+**B. ERA5 (optional)**
+
+* Use Copernicus CDS (`cdsapi`) if `--source=era5`. Fetch `surface_solar_radiation_downwards` and convert to instantaneous irradiance as documented by ERA5. Script must handle netCDF download and conversion.
+
+*(Script must implement exponential backoff and retry for API calls, and report rate-limit warnings in metadata.)*
+
+---
+
+### 3) Local sensor ingestion (optional)
+
+If `--include-local-sensors` flag is present:
+
+* Detect and read PZEM (RS485 via USB-RS485) and INA219/INA226 (I2C) if present.
+* Accept a `--sensors-config sensors.yaml` to specify COM port or I2C address per sensor.
+* Parse sensor values and map to:
+
+  * `pv_gen_kw` (kW) — if sensor is on PV output or inverter export
+  * `load_kw` (kW) — if sensor on house main consumption
+  * `voltage_v` (V), `current_a` (A)
+* Time-sync sensor rows to host clock and merge by nearest timestamp (within half timestep). If no sensor present, leave sensor columns NULL.
+
+---
+
+### 4) Output canonical columns & exact CSV header (order matters)
+
+Produce `collected_data.csv.gz` (or Parquet) with **these exact columns** (must be present in every file; empty/NULL allowed):
+
+```
+ts, lat, lon, source, actual_irradiance_wm2, temperature_C, cloud_cover_percent, wind_speed_m_s,
+pv_gen_kw, load_kw, voltage_v, current_a, tz
+```
+
+**Field notes**
+
+* `ts` → UTC ISO8601 (e.g., `2026-02-21T09:05:00Z`). **All times in output MUST be UTC.**
+* `lat`, `lon` → floats used to fetch data (copy of CLI args)
+* `source` → `'nasa_power'` or `'era5'` or `'local_sensor'` when appropriate
+* `pv_gen_kw`, `load_kw`, `voltage_v`, `current_a` → optional; include if measured locally. If not present, leave blank so the generator will derive them.
+* `tz` → canonical timezone string of the location (e.g., `Asia/Kolkata`) for downstream PV modeling.
+
+**Compression/format**: produce gzipped CSV `collected_data.csv.gz` and also write `collected_data.parquet` when `--format=parquet`.
+
+---
+
+### 5) Resampling & interpolation rules (must be deterministic & documented)
+
+* Convert the source timestamps to UTC and then resample to the target `--timestep` (default 5 minutes).
+* For **weather variables**:
+
+  * If source is hourly and target < 60: upsample with **time-based linear interpolation** for temperature, wind, cloud fraction.
+  * For irradiance (`actual_irradiance_wm2`) upsampling: linear interpolation is allowed for MVP; add an optional intra-hour stochastic variability model controlled by `--seed` (configurable amount) to produce realistic minute-scale variance. Document the interpolation method in metadata.
+* For **sensor values**: merge by nearest timestamp. If multiple sensor samples fall into the same timestep, take the mean.
+* Fill short gaps <= 30 minutes by interpolation; flag larger gaps in metadata and set missing values to NULL.
+
+---
+
+### 6) Units, normalization & precision rules (strict)
+
+* `actual_irradiance_wm2`: W/m² (float)
+* `temperature_C`: degrees Celsius (float)
+* `cloud_cover_percent`: 0–100 (float)
+* `wind_speed_m_s`: m/s (float)
+* `pv_gen_kw` / `load_kw` / `battery_power_kw`: kW (float)
+* `voltage_v`: Volts, `current_a`: Amps (float)
+* For CSV, use 6 decimal places for floats by default (configurable).
+
+---
+
+### 7) Metadata & provenance (must produce)
+
+Write `collected_metadata.json` containing:
+
+* CLI args and full config used
+* Exact API query strings / ERA5 request params
+* Lat/lon, timezone, row count, date range, seed, script git commit hash (if available)
+* Data quality summary: %missing per column, min/max/mean for major columns, detected large gaps, number of sensor samples ingested (if any)
+* Warning list if >5% missing rows after gap fill
+
+---
+
+### 8) Validation tests (script must run these and exit non-zero on failures)
+
+* **Time alignment test:** All `ts` must be multiples of `timestep` (in UTC). No duplicate `ts` per location row.
+* **Range tests:** irradiance >= 0; temperature within [-50, 60] °C; wind >= 0. If any row violates, clip to nearest valid and log the number of corrections in metadata.
+* **Schema test:** output CSV must contain exactly the header listed above.
+* **Compatibility test (important for Part B merge):** run a sample join check against an example `generator_config.yaml` expectation:
+
+  * If `collected_data.csv` contains `pv_gen_kw` and `load_kw` for a `household_id`, generator will use these measured columns. Otherwise generator will compute `pv_gen_kw` from `actual_irradiance_wm2` and populate `load_kw` from templates. To ensure mergeability: include `household_id` column in `collected_data.csv` if you are recording per-household measured PV/load (optional). If `household_id` is present, it must be a string and the generator expects the same `household_id` values used in the generator config. If `household_id` is absent, generator will assume weather-only input and replicate weather rows for each household per config.
+* **Sample join test** (run automatically when `--dry-run` is NOT set): if provided a `--sample-households sample_households.json` (optional), the script will attempt to perform the same join the generator will do and report mismatches (missing timestamps, tz mismatch, etc.).
+
+If any validation fails, script should log a clear error and exit with non-zero code.
+
+---
+
+### 9) Merge compatibility rules (how Part B will consume this file)
+
+**Primary rule:** the Data-Generation script will expect a weather/time index keyed by `ts`. Part B will either:
+
+* **Case A (measured PV/load provided):** If `collected_data.csv.gz` contains `pv_gen_kw` and `load_kw` and optionally `household_id` columns, Part B will use those measured values for the relevant households and timestamps. To support this, if your setup measures multiple households, include `household_id` in the collected data as additional column. If you provide `household_id`, ensure values match the `household_id` names in the generator configuration.
+
+* **Case B (weather-only):** If `pv_gen_kw` and `load_kw` are absent, Part B will derive `pv_gen_kw` from `actual_irradiance_wm2` using pvlib (requires `tz`, lat/lon present) and will synthesize `load_kw` using template profiles.
+
+**Therefore ensure:**
+
+* `ts` is UTC and continuous (no timezone ambiguity).
+* `actual_irradiance_wm2` column must be present and numeric.
+* If per-household PV/load measured: include `household_id` column (string) and use consistent IDs.
+* The file header must match exactly (case-sensitive) the columns listed earlier.
+
+---
+
+### 10) Output files & naming
+
+By default, write to `--out` directory:
+
+* `collected_data.csv.gz` (gzipped CSV)
+* `collected_data.parquet` (optional if `--format=parquet`)
+* `collected_metadata.json`
+* `collected_sample_hour.csv` — a small 1-hour sample slice for quick Pi testing (first day 1-hour chunk)
+* `logs/` — execution logs & API query logs
+
+---
+
+### 11) Example CLI usage
+
+```bash
+python data_collection.py \
+  --lat 18.5204 --lon 73.8567 \
+  --start 2025-01-01 --end 2025-03-31 \
+  --timestep 5 \
+  --source nasa_power \
+  --out ./data/collected \
+  --format csv \
+  --seed 42 \
+  --tz Asia/Kolkata
+```
+
+Optional with local sensors:
+
+```bash
+python data_collection.py --include-local-sensors --sensors-config sensors.yaml ...
+```
+
+---
+
+### 12) Logging, errors & reproducibility
+
+* Use structured logs (JSON logs recommended) with timestamps.
+* If API calls fail repeatedly, store partial download to a temp file and include partial metadata.
+* Provide `--dry-run` mode that performs all validations and prints a short compatibility report for the generator.
+
+---
+
+### 13) Tests & deliverables for hand-off
+
+Implementers must deliver:
+
+1. `data_collection.py` (or `data_collection` package) with README.
+2. `example_config.yaml` and `example_sensors.yaml`.
+3. A small unit test suite (pytest) that verifies: schema, resampling, basic range checks, and one API-cached sample.
+4. `collected_data.csv.gz` sample for `2025-01-01` to `2025-01-07` for lat/lon Pune as a proof artifact.
+5. `collected_metadata.json` showing API queries and data stats.
+6. A short `merge_check.py` that demonstrates merging `collected_data.csv.gz` with a small generator-config sample (no heavy compute) and prints any mismatches.
+
+---
+
+## Final compatibility checklist (quick)
+
+Before handing outputs to the Data-Generation script (Part B), ensure:
+
+* [ ] `collected_data.csv.gz` exists and unzips to a CSV with header exactly as specified.
+* [ ] Timestamps in UTC, aligned to `timestep`.
+* [ ] `actual_irradiance_wm2` present and non-negative.
+* [ ] If providing measured PV/load, include `household_id` column and ensure IDs match generator config.
+* [ ] `collected_metadata.json` contains API queries and summary stats.
+* [ ] Run `--dry-run` or `merge_check.py` to verify join compatibility.
+
+---
+

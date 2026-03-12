@@ -1,0 +1,110 @@
+# ============================================================================
+# generator_config.yaml — Grid Guardian Data-Generation Config (Part B)
+# ============================================================================
+# 3 household archetypes, market rules, events, noise, reward, ZK settings
+
+simulation:
+  timestep_min: 5
+  seed: 42
+
+# -------------------------------------------------------------------------
+# Households — 3 archetypes
+# -------------------------------------------------------------------------
+households:
+  - household_id: small_apartment_01
+    archetype: small_apartment
+    panel_kwp: 1.0
+    panel_tilt: 15
+    panel_azimuth: 180
+    system_efficiency: 0.78
+    soc_capacity_kwh: 4.0
+    initial_soc_kwh: 2.0
+    soc_min: 0.4
+    soc_max: 3.8
+    battery_nominal_power_kw: 1.0
+    efficiency_charge: 0.95
+    efficiency_discharge: 0.95
+    load_template: small_apartment_v1
+
+  - household_id: family_home_01
+    archetype: family_home
+    panel_kwp: 3.0
+    panel_tilt: 18
+    panel_azimuth: 180
+    system_efficiency: 0.80
+    soc_capacity_kwh: 6.0
+    initial_soc_kwh: 3.0
+    soc_min: 0.6
+    soc_max: 5.9
+    battery_nominal_power_kw: 1.5
+    efficiency_charge: 0.95
+    efficiency_discharge: 0.95
+    load_template: family_home_v1
+
+  - household_id: ev_owner_01
+    archetype: ev_owner
+    panel_kwp: 5.0
+    panel_tilt: 20
+    panel_azimuth: 190
+    system_efficiency: 0.82
+    soc_capacity_kwh: 10.0
+    initial_soc_kwh: 5.0
+    soc_min: 1.0
+    soc_max: 9.8
+    battery_nominal_power_kw: 3.0
+    efficiency_charge: 0.93
+    efficiency_discharge: 0.93
+    load_template: ev_owner_v1
+
+# -------------------------------------------------------------------------
+# Market rules
+# -------------------------------------------------------------------------
+market:
+  match_window_min: 15
+  delivery_window_min: 15
+  acceptance_rule: price_below_utility
+  min_offer_kwh: 0.1
+  max_offer_kwh: 3.0
+  price_floor: 2.0       # INR/kWh
+  price_ceiling: 20.0    # INR/kWh
+
+  utility_price_function:
+    tou_table:
+      "00:00-06:00": 3.0
+      "06:00-10:00": 5.0
+      "10:00-14:00": 6.0
+      "14:00-18:00": 5.5
+      "18:00-22:00": 8.0
+      "22:00-24:00": 4.0
+
+# -------------------------------------------------------------------------
+# Events — injected stochastically
+# -------------------------------------------------------------------------
+events:
+  cloud_ramp_prob_per_day: 0.20
+  ev_arrival_prob_per_day: 0.10
+  outage_prob_per_day: 0.01
+
+# -------------------------------------------------------------------------
+# Noise settings
+# -------------------------------------------------------------------------
+noise:
+  pv_std_fraction: 0.02
+  load_std_fraction: 0.05
+  missing_rate: 0.001
+
+# -------------------------------------------------------------------------
+# Reward computation coefficients
+# -------------------------------------------------------------------------
+reward:
+  cost_savings_coeff: 1.0
+  grid_stability_coeff: 0.1
+  battery_deg_coeff: 0.01
+
+# -------------------------------------------------------------------------
+# ZK commitment config
+# -------------------------------------------------------------------------
+zk:
+  commit_hash_algo: sha256
+  salt_length_bytes: 16
+  salt_store_path: "./data/generated/secrets"

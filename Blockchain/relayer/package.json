@@ -1,0 +1,15 @@
+{
+  "name": "grid-guardian-relayer",
+  "version": "1.0.0",
+  "description": "Meta-transaction relayer — verifies EIP-712 signatures and submits on-chain txs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.1",
+    "ethers": "^6.11.0",
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "axios": "^1.6.7"
+  }
+}

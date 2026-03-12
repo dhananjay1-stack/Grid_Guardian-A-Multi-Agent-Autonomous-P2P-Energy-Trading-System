@@ -1,0 +1,76 @@
+{
+  "final_eval": {
+    "mean_reward": -12485.66402016665,
+    "std_reward": 8708.209427719841,
+    "min_reward": -18643.297958499974,
+    "max_reward": -170.3961435,
+    "median_reward": -18643.297958499974,
+    "cvar_5pct": -18643.297958499974,
+    "safety_violation_rate": 0.500082671957672,
+    "soc_violations": 3672,
+    "total_steps": 12096,
+    "n_episodes": 3,
+    "mean_ep_length": 4032.0,
+    "energy_sold_kwh": 544.6810383333275,
+    "energy_bought_kwh": 315.6372039999999,
+    "episodes_with_violation": 3,
+    "action_drift": {
+      "kl_divergence": 1.6993508032170945,
+      "js_divergence": 0.10697694006742972,
+      "tvd": 0.21412037037019332,
+      "n_current": 12096,
+      "n_behavior": 12096
+    }
+  },
+  "stress_tests": {
+    "cloud_ramp": {
+      "mean_reward": -9092.877652500008,
+      "std_reward": 8486.975292500008,
+      "min_reward": -17579.852945000017,
+      "max_reward": -605.9023600000005,
+      "median_reward": -9092.877652500008,
+      "cvar_5pct": -16731.155415750018,
+      "safety_violation_rate": 0.26206457585927556,
+      "soc_violations": 1631,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 959.8144543333772,
+      "energy_bought_kwh": 459.22224133333333,
+      "episodes_with_violation": 2
+    },
+    "grid_outage": {
+      "mean_reward": -8892.877652500007,
+      "std_reward": 7996.975292500007,
+      "min_reward": -16889.852945000013,
+      "max_reward": -895.9023600000008,
+      "median_reward": -8892.877652500007,
+      "cvar_5pct": -16090.155415750012,
+      "safety_violation_rate": 0.12243953246152066,
+      "soc_violations": 1591,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 1014.6805513333354,
+      "energy_bought_kwh": 0.0,
+      "episodes_with_violation": 2
+    },
+    "sensor_dropout": {
+      "mean_reward": -9207.877652500008,
+      "std_reward": 7961.975292500005,
+      "min_reward": -17169.852945000013,
+      "max_reward": -1245.9023600000035,
+      "median_reward": -9207.877652500008,
+      "cvar_5pct": -16373.655415750012,
+      "safety_violation_rate": 0.2504918412220808,
+      "soc_violations": 1654,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 1045.3836193333716,
+      "energy_bought_kwh": 0.0,
+      "episodes_with_violation": 2
+    }
+  },
+  "training_time_sec": 299.0985038280487
+}

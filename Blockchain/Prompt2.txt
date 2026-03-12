@@ -1,0 +1,324 @@
+
+# Prompt — Implement Collateral & Gas Setup (end-to-end, VSCode, Hardhat, Pi + relayer)
+
+You are implementing **Step 2: Collateral & Gas Setup** for Grid-Guardian. This must integrate with the already completed IdentitySC (Step 1). Deliverables:
+
+* Solidity contracts: `CollateralSC` (node deposits, allowances), `MockUSDC` (ERC-20 stablecoin), optional `RelayerRegistry` or integrated functions.
+* Relayer server code that accepts Pi-signed gas-vouchers, verifies them, pays gas to submit transactions, and later redeems vouchers for reimbursement from CollateralSC.
+* Pi client scripts to request transactions via relayer (meta-tx request) and to sign gas-vouchers for reimbursement approval.
+* Hardhat tests (unit + integration) covering deposit, approveRelayer, voucher redemption, nonce/replay/expiry protection.
+* VSCode tasks and README to run everything locally (Hardhat node, docker postgres/ipfs still from Step1, relayer).
+* Security checklist and verification steps.
+
+Work in the same repository as Step1. Add files under `contracts/`, `relayer/`, `pi-client/`, `scripts/`, and `tests/`.
+
+---
+
+## High-level design (how things should work)
+
+1. Node deposits stablecoin (MockUSDC) into on-chain `CollateralSC` under their `nodeId` account. CollateralSC holds node balances.
+2. Node registers relayer allowances via `approveRelayer(relayerAddr, daily_limit, max_single)` on CollateralSC (or calls to the off-chain relayer flow which records limit).
+3. When a Pi wants a relayer to submit a transaction (meta-tx), Pi sends a signed **meta-tx request** to relayer (EIP-712 typed request that includes the target contract, calldata hash, maxGas, maxGasPrice, expiry, nonce).
+4. Relayer executes the transaction on chain, paying gas. To get reimbursed, the relayer presents an on-chain **GasVoucher** (signed by the Pi earlier or generated immediately after the meta-tx) to `CollateralSC.claimGas(voucher, signature)` which verifies the Pi signature, verifies allowance and nonces, and transfers stablecoin from node’s collateral to relayer’s address.
+5. All voucher claims are replay-protected via nonces and expiration; contract checks `IdentitySC` to ensure voucher signer is registered node owner.
+
+---
+
+## Contracts & APIs (Solidity skeletons)
+
+Create `contracts/MockUSDC.sol` (simple ERC20) and `contracts/CollateralSC.sol`.
+
+### `MockUSDC.sol`
+
+* Standard ERC-20 (OpenZeppelin) used as deposit currency for dev/test.
+
+### `CollateralSC.sol` (key functions)
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+interface IIdentitySC {
+    function nodes(bytes32 nodeId) external view returns (
+        address owner, bytes32 pubkeyHash, string memory metaURI, uint256 stake, uint256 registeredAt, bool active
+    );
+}
+
+contract CollateralSC is EIP712, AccessControl {
+    using ECDSA for bytes32;
+    IERC20 public stablecoin;
+    IIdentitySC public identitySC;
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
+    // nodeId => deposited balance
+    mapping(bytes32 => uint256) public deposits;
+
+    // nodeId => relayer => allowanceRemaining
+    mapping(bytes32 => mapping(address => uint256)) public relayerAllowance;
+
+    // nodeId => nonce for voucher replay protection
+    mapping(bytes32 => uint256) public voucherNonce;
+
+    event Deposited(bytes32 indexed nodeId, address indexed from, uint256 amount);
+    event Withdrawn(bytes32 indexed nodeId, address indexed to, uint256 amount);
+    event RelayerApproved(bytes32 indexed nodeId, address indexed relayer, uint256 allowance);
+    event GasClaimed(bytes32 indexed nodeId, address indexed relayer, uint256 amount, uint256 nonce);
+
+    // EIP-712 type for GasVoucher
+    struct GasVoucher {
+        bytes32 nodeId;
+        address relayer;
+        uint256 amount;          // stablecoin amount requested as reimbursement
+        uint256 maxGas;          // optional: gas estimate or cap
+        uint256 gasPrice;        // optional: gasPrice used
+        uint256 nonce;
+        uint256 expiry;          // block.timestamp expiry
+        bytes32 txHash;          // optional: hash of the tx executed to link voucher to that tx
+    }
+
+    bytes32 public constant GASVOUCHER_TYPEHASH = keccak256(
+        "GasVoucher(bytes32 nodeId,address relayer,uint256 amount,uint256 maxGas,uint256 gasPrice,uint256 nonce,uint256 expiry,bytes32 txHash)"
+    );
+
+    constructor(address _stablecoin, address _identitySC) EIP712("GridGuardian-Collateral", "1") {
+        stablecoin = IERC20(_stablecoin);
+        identitySC = IIdentitySC(_identitySC);
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(ADMIN_ROLE, msg.sender);
+    }
+
+    // deposit stablecoin into node account (must have approved token)
+    function deposit(bytes32 nodeId, uint256 amount) external {
+        require(amount > 0, "zero");
+        stablecoin.transferFrom(msg.sender, address(this), amount);
+        deposits[nodeId] += amount;
+        emit Deposited(nodeId, msg.sender, amount);
+    }
+
+    function withdraw(bytes32 nodeId, uint256 amount, address to) external onlyRole(ADMIN_ROLE) {
+        require(deposits[nodeId] >= amount, "insufficient");
+        deposits[nodeId] -= amount;
+        stablecoin.transfer(to, amount);
+        emit Withdrawn(nodeId, to, amount);
+    }
+
+    function approveRelayer(bytes32 nodeId, address relayer, uint256 allowance) external {
+        // only node owner can call (owner from IdentitySC)
+        (address owner,, , , , bool active) = identitySC.nodes(nodeId);
+        require(owner == msg.sender, "not owner");
+        require(active, "node inactive");
+        relayerAllowance[nodeId][relayer] = allowance;
+        emit RelayerApproved(nodeId, relayer, allowance);
+    }
+
+    // claim reimbursement by presenting signed GasVoucher
+    function claimGas(GasVoucher calldata voucher, bytes calldata signature) external {
+        // verify expiry
+        require(block.timestamp <= voucher.expiry, "voucher expired");
+        // verify relayer address matches caller
+        require(voucher.relayer == msg.sender, "invalid relayer");
+        // verify nonce
+        require(voucher.nonce == voucherNonce[voucher.nodeId], "invalid nonce");
+        // verify enough allowance
+        require(relayerAllowance[voucher.nodeId][msg.sender] >= voucher.amount, "allowance exceeded");
+        require(deposits[voucher.nodeId] >= voucher.amount, "insufficient deposit");
+
+        // verify signer is node owner recorded in IdentitySC
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
+            GASVOUCHER_TYPEHASH,
+            voucher.nodeId,
+            voucher.relayer,
+            voucher.amount,
+            voucher.maxGas,
+            voucher.gasPrice,
+            voucher.nonce,
+            voucher.expiry,
+            voucher.txHash
+        )));
+        address signer = ECDSA.recover(digest, signature);
+        (address owner,, , , , bool active) = identitySC.nodes(voucher.nodeId);
+        require(active, "node not active");
+        require(signer == owner, "invalid signature");
+
+        // update state
+        voucherNonce[voucher.nodeId] += 1;
+        relayerAllowance[voucher.nodeId][msg.sender] -= voucher.amount;
+        deposits[voucher.nodeId] -= voucher.amount;
+        stablecoin.transfer(msg.sender, voucher.amount);
+        emit GasClaimed(voucher.nodeId, msg.sender, voucher.amount, voucher.nonce);
+    }
+
+    // view helpers, admin functions, emergency withdrawal...
+}
+```
+
+**Notes:**
+
+* `claimGas` requires the Pi (node owner) signed `GasVoucher` off-chain (EIP-712). Relayer calls `claimGas` to transfer reimbursement.
+* `approveRelayer` must be called by the node owner to set the relayer allowance. This prevents relayer from draining funds without permission.
+* `txHash` links voucher to a particular meta-tx; include it to prevent relayer from reusing voucher for other txs.
+
+---
+
+## Pi client flow (what to implement)
+
+Files: `pi-client/request_meta_tx.js`, `pi-client/sign_gas_voucher.js`.
+
+1. Pi crafts a meta-tx request describing the intended on-chain action:
+
+   ```json
+   {
+     "target": "<contractAddress>",
+     "calldataHash": "<keccak256(calldata)>",
+     "maxGas": 200000,
+     "maxGasPrice": "20000000000",
+     "nonce": 5,
+     "expiry": 1690000000
+   }
+   ```
+2. Pi signs this meta-tx request using EIP-712 and sends to relayer (`POST /meta-tx/request`).
+3. Option A: Pi pre-signs a `GasVoucher` with placeholder `txHash=0x0`, `amount = estimatedStableAmount`, `nonce = CollateralSC.voucherNonce(nodeId)` and sends voucher to relayer to be redeemed after relayer executes the tx. (Better: Pi signs voucher after relayer returns the actual txHash and actual gasUsed.)
+4. Option B (preferred): Pi pre-authorizes a **voucher template** for a maximum daily allowance; relayer will use voucher template to submit claim with correct nonce and actual amount but only if the signed voucher included the correct `txHash`. For security, require voucher signed after relayer returns the real `txHash` OR use a two-step: (a) Pi signs meta-tx, relayer executes and returns txHash and gasUsed, (b) Pi signs the `GasVoucher` with txHash and exact amount and sends it to relayer, (c) relayer calls `CollateralSC.claimGas`.
+
+Implementation suggestion for dev:
+
+* Start with flow where Pi pre-signs voucher **after** execution (simulate Pi available to sign immediately). For automated integration tests, the test harness will sign voucher after the relayer executes tx.
+
+Example EIP-712 signing (JS):
+
+```js
+const domain = {
+  name: "GridGuardian-Collateral",
+  version: "1",
+  chainId: 31337,
+  verifyingContract: COLLATERAL_SC_ADDRESS
+};
+const types = {
+  GasVoucher: [
+    { name: "nodeId", type: "bytes32" },
+    { name: "relayer", type: "address" },
+    { name: "amount", type: "uint256" },
+    { name: "maxGas", type: "uint256" },
+    { name: "gasPrice", type: "uint256" },
+    { name: "nonce", type: "uint256" },
+    { name: "expiry", type: "uint256" },
+    { name: "txHash", type: "bytes32" }
+  ]
+};
+
+const message = {
+  nodeId: nodeIdHex,
+  relayer: relayerAddress,
+  amount: amountWei,
+  maxGas,
+  gasPrice,
+  nonce,
+  expiry,
+  txHash: txHashBytes32
+};
+
+const signature = await wallet._signTypedData(domain, types, message);
+```
+
+---
+
+## Relayer server (what to implement)
+
+`relayer/server.js` responsibilities:
+
+1. Accept meta-tx requests from Pi: validate EIP-712 signature or signed payload, validate Pi is a registered node via IdentitySC.
+2. Estimate gas and execute provided transaction on chain (simulate or actually call). Use `provider.getSigner(relayer)` to send tx so gas paid by relayer account.
+3. Return txHash and gasUsed/gasPrice to Pi.
+4. Receive signed `GasVoucher` from Pi (signed after execution) with the `txHash` and `amount` (stablecoin reimbursement amount).
+5. Call `CollateralSC.claimGas(voucher, signature)` to receive reimbursement. Check success and report status.
+6. Provide endpoints: `/meta-tx/request`, `/voucher/submit`, `/nonce/:nodeId`, `/allowance/:nodeId/:relayer`.
+
+Relayer should:
+
+* Maintain per-node nonces (but `CollateralSC` has on-chain nonce, use it as source-of-truth).
+* Rate limit requests and log all actions.
+* Verify final voucher matches the executed txHash and gasUsed (off-chain check).
+
+---
+
+## Tests (Hardhat / Mocha)
+
+Create tests covering:
+
+* `deposit` increases `deposits[nodeId]`.
+* `approveRelayer` only callable by node owner (owner from IdentitySC).
+* `claimGas` success flow: Pi owner signs voucher, relayer calls `claimGas`, stablecoin transferred and allowance decremented.
+* `claimGas` failure on expired voucher, wrong relayer, invalid signature, insufficient allowance, insufficient deposit, and replayed nonce.
+* Integration test: simulate Pi → relayer meta-tx flow with real transaction (e.g., call a benign contract function or `IdentitySC.registerNode` for a second node), then voucher signature and `claimGas`.
+
+Test commands:
+
+```bash
+# start hardhat node
+npx hardhat node
+# run tests
+npx hardhat test
+# integration flow (script)
+node scripts/integration/gas_flow.js
+```
+
+---
+
+## VSCode tasks & docker (quick run)
+
+Add tasks to `.vscode/tasks.json`:
+
+* Start Hardhat node
+* Deploy contracts
+* Start relayer
+* Run integration tests
+
+Use `docker-compose` from Step1; no new containers required except optional `relayer` in Docker. Ensure `MockUSDC` and `CollateralSC` addresses are exported in `.env` for relayer and pi-client.
+
+---
+
+## Security & operational best practices
+
+* **Require Pi owner approval**: `approveRelayer` must be explicit and on-chain; daily limits and per-tx caps should be set.
+* **Nonce & expiry**: Enforce `voucher.nonce == CollateralSC.voucherNonce[nodeId]` and `expiry` to avoid reuse or long-term replay vectors.
+* **Link voucher to tx**: Always include `txHash` in voucher to ensure reimbursement only for the specific tx executed.
+* **Minimum collateral**: Set minimal deposit thresholds for nodes. Optionally implement `minDeposit` in CollateralSC and require `deposit >= minDeposit` before `approveRelayer` or certain operations.
+* **Slashing & disputes**: If relayer misbehaves (claims incorrect amount), allow admin/owner to dispute within a time window and revert reimbursement (implement dispute flow if required).
+* **Gas accounting**: Prefer reimbursement in stablecoin (USDC) and calculate amount = gasUsed * effectiveGasPrice * relayerFeeMultiplier (e.g., 1.02 for small fee). Pi should sign final voucher with agreed amount.
+* **Relayer trust model**: Keep relayer stateless, log everything, provide audit endpoints, and make relayer replaceable.
+
+---
+
+## Verification checklist (what to verify after implementation)
+
+* [ ] MockUSDC deployed and mintable by test accounts.
+* [ ] CollateralSC deployed and linked to IdentitySC address.
+* [ ] Node can `deposit(nodeId, amount)` using MockUSDC (token approved).
+* [ ] Node owner can call `approveRelayer(nodeId, relayer, allowance)` and allowance stored.
+* [ ] Relayer executes a meta-tx on behalf of Pi (Pi pre-signed meta-tx request verified).
+* [ ] Relayer obtains txHash and gasUsed and returns them to Pi in the flow.
+* [ ] Pi signs `GasVoucher` which includes correct `txHash` and `amount`.
+* [ ] Relayer `claimGas` on CollateralSC succeeds, stablecoin transfer occurs, allowance and deposit updated, voucherNonce increments.
+* [ ] Tests cover expiry, wrong relayer, insufficient deposit and replay attempts.
+* [ ] VSCode tasks run the whole flow in one command (deploy → simulate → claim).
+
+---
+
+## Deliverables (what to commit)
+
+1. `contracts/MockUSDC.sol` and `contracts/CollateralSC.sol` with comments & NatSpec.
+2. `scripts/deploy_collateral.js` (deploy MockUSDC, CollateralSC, configure addresses).
+3. `relayer/server.js` + README for API.
+4. `pi-client/` scripts for meta-tx request + voucher signing.
+5. `tests/collateral.test.js` and `tests/integration/gas_flow.js`.
+6. `.vscode/tasks.json` and `README.md` with step-by-step run instructions.
+7. Security checklist + small section in README describing production differences (hardware secure element + on-chain minDeposit + dispute policies).
+
+---
+
+

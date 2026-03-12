@@ -1,0 +1,71 @@
+2026-03-03T00:01:08 [INFO] ======================================================================
+2026-03-03T00:01:08 [INFO]   Grid-Guardian RL Training Pipeline v1.0.0
+2026-03-03T00:01:08 [INFO]   Algorithm: CQL | Mode: offline | Seed: 42 | Device: cpu
+2026-03-03T00:01:08 [INFO] ======================================================================
+2026-03-03T00:01:08 [INFO] Random seed set to 42 (deterministic=True)
+2026-03-03T00:01:08 [INFO] Loaded dataset: ./data/partitioned/train.csv (39741 rows, 29 cols)
+2026-03-03T00:01:08 [INFO] Loaded dataset: ./data/partitioned/val.csv (12096 rows, 29 cols)
+2026-03-03T00:01:08 [INFO] Loaded dataset: ./data/partitioned/test.csv (25923 rows, 29 cols)
+2026-03-03T00:01:08 [INFO] Obs dim: 18 | Act dim: 7
+2026-03-03T00:01:08 [INFO] Safety shield enabled: mode=clip
+2026-03-03T00:01:08 [INFO] Converting dataset to transitions...
+2026-03-03T00:01:27 [INFO] Transitions: 39738
+2026-03-03T00:01:27 [INFO] Replay buffer: 39738 transitions
+2026-03-03T00:01:27 [INFO] Training BC baseline for behavior policy estimation...
+2026-03-03T00:01:51 [INFO] BC epoch 10/30  train_loss=0.1887
+2026-03-03T00:02:03 [INFO] BC epoch 20/30  train_loss=0.1221
+2026-03-03T00:02:18 [INFO] BC epoch 30/30  train_loss=0.1066
+2026-03-03T00:02:18 [INFO] BC model saved to models\BC\run_42\checkpoint_best.pt
+2026-03-03T00:02:18 [INFO] BC baseline trained and saved
+2026-03-03T00:02:18 [INFO] Agent created: CQL
+2026-03-03T00:02:19 [INFO] TensorBoard logging to logs\CQL\CQL_42_1772476268
+2026-03-03T00:02:19 [INFO] Starting CQL training in offline mode...
+2026-03-03T00:02:19 [INFO] Offline training: 5000 steps, batch=256
+2026-03-03T00:02:40 [INFO] Step 2500/5000  loss=0.328626
+2026-03-03T00:03:15 [INFO] Training complete in 55.9 seconds
+2026-03-03T00:03:15 [INFO] Running final evaluation...
+2026-03-03T00:03:26 [INFO] Final eval: mean_reward=-12305.6640  safety_rate=0.3853  CVaR=-18373.2980
+2026-03-03T00:03:26 [INFO] Running stress tests...
+2026-03-03T00:03:27 [INFO] Stress test: cloud_ramp
+2026-03-03T00:03:47 [INFO] Safety shield: 10000 incidents total
+2026-03-03T00:04:05 [INFO] Stress test: grid_outage
+2026-03-03T00:04:46 [INFO] Safety shield: 20000 incidents total
+2026-03-03T00:04:51 [INFO] Stress test: sensor_dropout
+2026-03-03T00:05:07 [INFO] Safety shield: 30000 incidents total
+2026-03-03T00:05:33 [INFO]   cloud_ramp: reward=-7049.4826  safety_rate=0.108761
+2026-03-03T00:05:33 [INFO]   grid_outage: reward=-18113.2670  safety_rate=0.228839
+2026-03-03T00:05:33 [INFO]   sensor_dropout: reward=-11605.6868  safety_rate=0.245111
+2026-03-03T00:05:33 [INFO] Running OPE: ['IS', 'WIS', 'FQE', 'DR']
+2026-03-03T00:14:25 [INFO] OPE results: {'IS': '0.0000 [0.0000, 0.0000]', 'WIS': '0.0000 [0.0000, 0.0000]', 'FQE': '4.4080 [4.2124, 4.5958]', 'DR': '313036.3240 [313036.3240, 313036.3240]'}
+2026-03-03T00:14:25 [INFO] Eval summary saved to eval\CQL\eval_summary.json
+2026-03-03T00:14:28 [INFO] Learning curves saved to eval\CQL\eval_plots
+2026-03-03T00:14:28 [INFO] OPE results saved to ope\CQL
+2026-03-03T00:14:28 [INFO] TorchScript model saved to edge\policy_pack\cql_policy.torchscript
+C:\Users\DELL\Grid_Guardian\Agentic_AI\model_packaging\exporter.py:112: UserWarning: # 'dynamic_axes' is not recommended when dynamo=True, and may lead to 'torch._dynamo.exc.UserError: Constraints violated.' Supply the 'dynamic_shapes' argument instead if export is unsuccessful.
+  torch.onnx.export(
+W0303 00:14:29.587000 19328 venv\Lib\site-packages\torch\onnx\_internal\exporter\_compat.py:125] Setting ONNX exporter to use operator set version 18 because the requested opset_version 14 is a lower version than we have implementations for. Automatic version conversion will be performed, which may not be successful at converting to the requested version. If version conversion is unsuccessful, the opset version of the exported model will be kept at 18. Please consider setting opset_version >=18 to leverage latest ONNX features
+W0303 00:14:30.733000 19328 venv\Lib\site-packages\torch\onnx\_internal\exporter\_registration.py:110] torchvision is not installed. Skipping torchvision::nms
+W0303 00:14:30.735000 19328 venv\Lib\site-packages\torch\onnx\_internal\exporter\_registration.py:110] torchvision is not installed. Skipping torchvision::roi_align
+W0303 00:14:30.736000 19328 venv\Lib\site-packages\torch\onnx\_internal\exporter\_registration.py:110] torchvision is not installed. Skipping torchvision::roi_pool
+C:\Program Files\Python312\Lib\copyreg.py:99: FutureWarning: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+  return cls.__new__(cls, *args)
+2026-03-03T00:14:33 [WARNING] The model version conversion is not supported by the onnxscript version converter and fallback is enabled. The model will be converted using the onnx C API (target version: 14).
+2026-03-03T00:14:33 [INFO] No unused functions to remove
+2026-03-03T00:14:33 [INFO] Skipping constant folding for node 'node_sub' because it is graph input to preserve graph signature
+2026-03-03T00:14:33 [INFO] No unused functions to remove
+2026-03-03T00:14:33 [INFO] PassManager: No more graph changes detected after step 0
+2026-03-03T00:14:33 [INFO] ONNX model saved to edge\policy_pack\cql_policy.onnx
+2026-03-03T00:14:33 [INFO] Model card saved to ./edge/policy_pack
+2026-03-03T00:14:34 [INFO] Safety shield summary: {'total_incidents': 32888, 'logged_incidents': 32888, 'modes': {'clip': 32888, 'fallback': 0, 'reject': 0}}
+2026-03-03T00:14:34 [INFO] ======================================================================
+2026-03-03T00:14:34 [INFO]   TRAINING COMPLETE ΓÇö CQL
+2026-03-03T00:14:34 [INFO]   Final reward: -12305.6640 | Safety rate: 0.385334
+2026-03-03T00:14:34 [INFO]   Model: models\CQL\run_42
+2026-03-03T00:14:34 [INFO]   Logs:  logs\CQL\CQL_42_1772476268
+2026-03-03T00:14:34 [INFO] ======================================================================
+[torch.onnx] Obtain model graph for `WrappedPolicy([...]` with `torch.export.export(..., strict=False)`...
+[torch.onnx] Obtain model graph for `WrappedPolicy([...]` with `torch.export.export(..., strict=False)`... Γ£à
+[torch.onnx] Run decomposition...
+[torch.onnx] Run decomposition... Γ£à
+[torch.onnx] Translate the graph into ONNX...
+[torch.onnx] Translate the graph into ONNX... Γ£à

@@ -1,0 +1,15 @@
+{
+  "name": "grid-guardian-pi-client",
+  "version": "1.0.0",
+  "description": "Raspberry Pi client — key generation, signing, relayer registration",
+  "scripts": {
+    "generate-keys": "node generate_keys.js",
+    "register": "node register_via_relayer.js",
+    "attest": "node device_attestation.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.1",
+    "ethers": "^6.11.0"
+  }
+}

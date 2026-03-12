@@ -1,0 +1,175 @@
+PROMPT: Implement `dataset_fixer.py` — Auto-fix & Synthetic Imputation Tool for Grid-Guardian
+
+Goal (one line)
+Build `dataset_fixer.py` — a single, runnable Python tool that **repairs, fills, and retunes** the Grid-Guardian dataset artifacts produced by Part B so the dataset becomes consistent, complete, and usable for RL training. The tool must (1) safely auto-fix deterministic arithmetic/consistency bugs (mass-balance, types), (2) synthetically fill missing but non-sensitive fields (voltage/current, small sensor gaps), (3) autotune household offer-policy parameters to restore archetype market participation (e.g., fix `small_apartment_01` 0-offers issue) and (4) re-run a matching simulation (or re-price offers) to raise trade acceptance to a configurable target — all reproducible via `--seed`. All changes must be logged, reversible (backup originals), and produce a before/after audit report.
+
+Environment & allowed libs
+
+* Python 3.10+
+* Allowed (pip): `pandas`, `numpy`, `pyyaml`, `pyarrow` (optional), `tqdm`, `pytz`, `cryptography` (optional for salt encryption), `click` or `argparse`.
+* Install example: `# pip install pandas numpy pyyaml pyarrow tqdm pytz cryptography`
+
+Safety & security note (MUST be followed)
+
+* **Never** write salts or private keys into CSV outputs or logs. Salt files must remain in `secrets/` with POSIX `600` perms.
+* Any synthetic data inserted must be clearly flagged (new synthetic flag columns or `_synthetic` suffix columns) so downstream users know which values were imputed.
+
+Inputs (required & optional)
+
+* `--generated <path>` (required) — `./data/generated/generated_dataset.csv.gz` (canonical 23-col file)
+* `--offers <path>` (required) — `./data/generated/offers.csv.gz`
+* `--trades <path>` (required) — `./data/generated/trades.csv.gz`
+* `--collected <path>` (optional) — `./data/collected/collected_data.csv.gz` (for reference)
+* `--secrets-dir <path>` (optional) — `./data/generated/secrets` (used to check/generate salts)
+* `--config <path>` (optional) — `generator_config.yaml` (to update archetype params)
+* `--out <path>` — output folder (default `./data/fixed`)
+* `--seed <int>` — deterministic seed (default 42)
+* `--target_acceptance <float>` — e.g., `0.01` for 1% acceptance (default 0.01)
+* `--fix-netkw` — apply safe net_kw recompute (recommended)
+* `--fix-voltage-current` — enable synthetic voltage/current fill (recommended in sensor-less setups)
+* `--autotune-archetypes` — enable automatic parameter tuning (for households with 0 offers or below min_offers)
+* `--reprice-offers` — enable offer price retuning / matching simulation to hit `--target_acceptance`
+* `--apply` — actually write fixed files; if omitted run only as `--dry-run` producing a suggested-change report
+* `--backup-dir <path>` — where original files are copied before any write (default `./data/backup_timestamp`)
+* `--plot` — optional diagnostics PNGs
+
+Outputs (files the script must produce when `--apply` used)
+
+* `out/generated_dataset_fixed.csv.gz` — fixed canonical dataset (23-col), with any changed fields updated and extra metadata columns appended **only** for traceability (see below).
+* `out/offers_fixed.csv.gz` — offers after commit_hash/salt fixes and re-pricing (if modified).
+* `out/trades_fixed.csv.gz` — new/updated trades if matching simulation created additional accepted offers (clearly annotated as synthetic/auto-generated).
+* `out/secrets/` — any newly generated salts written as `secrets/<household>/<offer_id>.salt` (POSIX 600). If `--encrypt-salts` optional behavior used, store encrypted bundle and provide `reveal_salts.py` usage notes. **Do not** embed salts in CSVs.
+* `out/fix_report.json` — structured before/after diff, per-issue counts, changes made (rows changed, columns changed), household-level diagnostics (offers per household before/after, acceptance rate before/after).
+* `out/fix_report.md` — human-readable remediation report with recommended config edits if `--autotune-archetypes` did not run.
+* `out/consistency_samples.csv` — sample rows that were changed (max 1000).
+* `out/README_added.md` — if README missing, auto-generate a minimal README describing dataset, commit scheme, and how fixes were applied.
+* `out/generation_summary_updated.json` — patched `generation_summary.json` with `collected_data_source` pointer (if missing), and updated counts.
+
+Core Fixes & Algorithms (detailed — implement all below)
+
+A. Safe arithmetic & mass-balance correction (MANDATORY)
+
+* If `--fix-netkw` present: recompute `net_kw = pv_gen_kw - load_kw` for all rows where both pv_gen_kw and load_kw are numeric. Use high-precision floats and then round to `--round-digits` (default 9). Overwrite `net_kw` values in a copy (and in outputs) and log number of rows changed. Provide an option to rollback or to only include corrected values in a separate column `net_kw_corrected` when `--apply` not specified.
+
+B. Fill missing current/voltage (OPTIONAL but recommended when sensors not present)
+
+* When `voltage_v` or `current_a` are 100% null (sensor-less) or partially missing and `--fix-voltage-current` set:
+
+  1. Set `voltage_v_synth` = household nominal voltage from config `generator_config.yaml` (if present) or default 230.0 V. Add column `voltage_v_synth_flag` boolean for rows where value is synthetic.
+  2. Compute `current_a` as `abs(net_kw) * 1000 / voltage_v_synth`. Set `current_a_synth_flag`.
+  3. If both are present but inconsistent with power plausibility (difference > 30%), prefer original but add `plausibility_warning` flag and optionally overwrite if `--apply` and `--force-current-correction` set.
+* Document all synthetic values in `fix_report.json` with counts and reason.
+
+C. Archetype participation autotune (ESSENTIAL to fix `small_apartment_01`)
+
+* If `--autotune-archetypes` enabled, algorithm must:
+
+  1. Load `generator_config.yaml` or infer defaults. For each household with #offers < `min_offers_threshold` (configurable; default 10), adjust local policy parameters in-memory or in a patched config copy:
+
+     * Decrease `min_sell_threshold` or lower `soc_min` margin by configurable steps. Optionally increase `initial_soc_kwh` if safe (only in simulation, mark synthetic).
+     * Decrease `min_offer_kwh` and `max_offer_kwh` bounds if they prevent small offers.
+     * Decrease `offer_price_markup` (percent over utility) for that household to make offers competitive.
+  2. Re-run a **local offer generation pass** for only the affected household(s) using updated parameters (must use the same PV & load rows). Append new offers to `offers_fixed.csv.gz` (or replace) and log details.
+  3. For each change, record the exact parameter edits in `fix_report.json` and produce `generator_config_patched.yaml` in `out/` (do not overwrite original unless user asks).
+* The autotuner must be conservative: do not change soc_capacity or physical panel_kwp — only behavioral policy thresholds and initial SOC (and mark those modifications as synthetic in outputs).
+
+D. Offer re-pricing & matching simulation to reach `--target_acceptance`
+
+* If `--reprice-offers` enabled:
+
+  1. Load utility price function from `generator_config.yaml`. For each offer compute `price_gap = offer_price - utility_price_at_ts`.
+  2. Strategy A (recommend default, safe): iteratively reduce `offer_price` by a configurable factor (e.g., 5% steps) until simulated acceptance probability (simple model: accepted if offer_price <= utility_price * (1 + ε) or probabilistic model p = max(0, 1 - price_gap/utility_price * K)) achieves `--target_acceptance` or until price_floor hit. Price floor cannot be below `price_floor` from config.
+  3. Strategy B (alternative): change matching rule to `probabilistic` for simulated matching: buyer accepts with probability `p = sigmoid(a*(utility_price - offer_price))` with tunable `a`. Adjust `a` to meet acceptance target.
+  4. When simulated matching accepts an offer, create a synthetic `trade_id` entry in `trades_fixed.csv.gz` and a matching settlement stub. All synthetic trades must be annotated (e.g., `trade_id` prefixed `synthetic_`) and flagged in `trades_fixed.csv.gz` column `synthetic_trade=True`.
+  5. For each updated offer, recompute `commit_hash` using the existing salt (if salt exists) or generate salt (store in secrets) and write updated commit_hash to `offers_fixed.csv.gz`. Log salts generated.
+  6. Stop when acceptance rate ≥ `--target_acceptance` or no further safe price reductions possible. Record acceptance rate before/after and per-household acceptance.
+
+E. Fix missing salts for households (e.g., small_apartment_01)
+
+* Find offers with missing salt files for a household; for those offers, generate secure random salt of config length (default 16 bytes), write to `secrets/<household>/<offer_id>.salt` with mode `600`, recompute commit_hash, and update offers/trades accordingly. Log all generated salt files. (If `--dry-run` do not write, but list.)
+
+F. Type consistency & cosmetic fixes
+
+* Normalize `trade_id` column dtype to string (nullable), cast `offer_id` to string, and ensure no mixed dtypes. Fix mixed-int/NaN columns. Replace NaN in `trade_id` with empty string or consistent null marker per canonical spec.
+
+G. README & generation_summary fixes
+
+* If `README.md` missing (in project root or dataset folder), auto-generate minimal `README_added.md` describing data files, canonical header, commit hash scheme, and how fixes were applied.
+* Ensure `generation_summary.json` contains `collected_data_source` pointer; if missing, add pointer to `collected_metadata.json` path provided via `--collected`. Do NOT alter original file unless `--apply` and `--backup-dir` provided; write updated copy to `out/`.
+
+H. Logging, backups & reversibility (MANDATORY)
+
+* Before any write, create a full backup of original files into `--backup-dir` with timestamp. If `--apply` not set, do nothing to originals (dry-run).
+* Produce detailed `fix_report.json` describing every change: file, row_count_changed, before_value, after_value, reason, seed used. Include a checksum (sha256) of original and fixed files for traceability.
+* Provide a `--revert` helper description in README to restore originals from backup.
+
+I. Tests & QA (deliverables)
+
+* Provide unit tests (pytest): test_netkw_fix, test_voltage_current_synth, test_autotune_archetype_adjustment (mocked), test_commit_hash_regen (use sample salts), test_dtype_normalization.
+* Produce `out/sanity_check.json` summarizing pass/fail of automated QA after fixes.
+
+Operational constraints & ethical notes
+
+* Synthetic fills must be conservative and "physically plausible" (e.g., current computed from net_kw and nominal voltage). Add `_synthetic` boolean flags (e.g., `voltage_v_synth_flag`, `current_a_synth_flag`, `initial_soc_synth_flag`) in the fixed CSV so downstream users can filter/impute differently.
+* Mark all synthetic trades/offers distinctly (`synthetic_offer` / `synthetic_trade` boolean). Do not mark original real trades as synthetic.
+* Salt generation must use a cryptographically secure RNG (e.g., `os.urandom`) and file perms 600.
+* If `--apply` is omitted, produce a full `fix_report.json` and `fix_preview/` folder with sample patched rows but do not write final CSVs or salts.
+
+Reporting & outputs (summary)
+
+* `out/fix_report.json` (detailed) & `out/fix_report.md` (human readable)
+* `out/generated_dataset_fixed.csv.gz`, `out/offers_fixed.csv.gz`, `out/trades_fixed.csv.gz` (only if `--apply`)
+* `out/secrets/` new salts (only if `--apply`)
+* `out/consistency_samples.csv` (rows changed)
+* `out/README_added.md` (if README originally missing)
+* `out/generation_summary_updated.json` (if patched)
+* `out/sanity_check.json` (QA results)
+* `--backup-dir` contains original copies
+
+Example CLI usage (dry-run -> preview -> apply)
+
+```bash
+# Dry run: generate fix proposal only
+python dataset_fixer.py \
+  --generated ./data/generated/generated_dataset.csv.gz \
+  --offers ./data/generated/offers.csv.gz \
+  --trades ./data/generated/trades.csv.gz \
+  --collected ./data/collected/collected_data.csv.gz \
+  --config ./configs/generator_config.yaml \
+  --out ./data/fixed_preview \
+  --seed 42 \
+  --target_acceptance 0.01 \
+  --autotune-archetypes \
+  --reprice-offers
+
+# Apply fixes (after reviewing preview)
+python dataset_fixer.py \
+  --generated ./data/generated/generated_dataset.csv.gz \
+  --offers ./data/generated/offers.csv.gz \
+  --trades ./data/generated/trades.csv.gz \
+  --secrets-dir ./data/generated/secrets \
+  --config ./configs/generator_config.yaml \
+  --out ./data/fixed_apply \
+  --seed 42 \
+  --target_acceptance 0.01 \
+  --autotune-archetypes \
+  --reprice-offers \
+  --fix-netkw \
+  --fix-voltage-current \
+  --apply \
+  --backup-dir ./data/backup_2026-02-28
+```
+
+Deliverables (must be handed to you)
+
+* `dataset_fixer.py`, `requirements.txt`
+* `example_fix_config.yaml` (parameters: thresholds, min_offers_per_archetype, price_floor_limits, autotune steps)
+* `out/` with fixed files & reports when `--apply` used
+* Unit tests (pytest) & README for use/risk notes
+* A short `changelog.txt` describing exactly what automated edits were made and their rationale
+
+Final note (clarity)
+This tool **automates conservative fixes** — not arbitrary fabrication. It must always log and mark synthetic data. It must not remove or alter original dataset provenance; instead it writes fixed copies and backups. Use this prompt to generate a production-ready `dataset_fixer.py` that repairs the three primary defects you reported (small_apartment participation, very low trade acceptance, tiny mass-balance tolerance) and fills safe missing cells so the dataset is complete for RL training.
+
+---
+

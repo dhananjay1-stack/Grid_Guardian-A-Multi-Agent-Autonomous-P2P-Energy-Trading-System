@@ -1,0 +1,81 @@
+events:
+  cloud_ramp_prob_per_day: 0.2
+  ev_arrival_prob_per_day: 0.1
+  outage_prob_per_day: 0.01
+households:
+- archetype: small_apartment
+  battery_nominal_power_kw: 1.0
+  efficiency_charge: 0.95
+  efficiency_discharge: 0.95
+  household_id: small_apartment_01
+  initial_soc_kwh: 2.0
+  load_template: small_apartment_v1
+  min_offer_kwh_relaxed: 0.020000000000000004
+  offer_price_markup: 0.88
+  panel_azimuth: 180
+  panel_kwp: 1.0
+  panel_tilt: 15
+  soc_capacity_kwh: 4.0
+  soc_margin_for_offer: 0.05
+  soc_max: 3.8
+  soc_min: 0.4
+  system_efficiency: 0.78
+- archetype: family_home
+  battery_nominal_power_kw: 1.5
+  efficiency_charge: 0.95
+  efficiency_discharge: 0.95
+  household_id: family_home_01
+  initial_soc_kwh: 3.0
+  load_template: family_home_v1
+  panel_azimuth: 180
+  panel_kwp: 3.0
+  panel_tilt: 18
+  soc_capacity_kwh: 6.0
+  soc_max: 5.9
+  soc_min: 0.6
+  system_efficiency: 0.8
+- archetype: ev_owner
+  battery_nominal_power_kw: 3.0
+  efficiency_charge: 0.93
+  efficiency_discharge: 0.93
+  household_id: ev_owner_01
+  initial_soc_kwh: 5.0
+  load_template: ev_owner_v1
+  panel_azimuth: 190
+  panel_kwp: 5.0
+  panel_tilt: 20
+  soc_capacity_kwh: 10.0
+  soc_max: 9.8
+  soc_min: 1.0
+  system_efficiency: 0.82
+market:
+  acceptance_rule: price_below_utility
+  delivery_window_min: 15
+  match_window_min: 15
+  max_offer_kwh: 3.0
+  min_offer_kwh: 0.1
+  price_ceiling: 20.0
+  price_floor: 2.0
+  utility_price_function:
+    tou_table:
+      00:00-06:00: 3.0
+      06:00-10:00: 5.0
+      10:00-14:00: 6.0
+      14:00-18:00: 5.5
+      18:00-22:00: 8.0
+      22:00-24:00: 4.0
+noise:
+  load_std_fraction: 0.05
+  missing_rate: 0.001
+  pv_std_fraction: 0.02
+reward:
+  battery_deg_coeff: 0.01
+  cost_savings_coeff: 1.0
+  grid_stability_coeff: 0.1
+simulation:
+  seed: 42
+  timestep_min: 5
+zk:
+  commit_hash_algo: sha256
+  salt_length_bytes: 16
+  salt_store_path: ./data/generated/secrets

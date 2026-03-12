@@ -1,0 +1,11 @@
+2026-03-02T23:42:06 [INFO] ======================================================================
+2026-03-02T23:42:06 [INFO]   Grid-Guardian RL Training Pipeline v1.0.0
+2026-03-02T23:42:06 [INFO]   Algorithm: CQL | Mode: offline | Seed: 42 | Device: cpu
+2026-03-02T23:42:06 [INFO] ======================================================================
+2026-03-02T23:42:06 [INFO] Random seed set to 42 (deterministic=True)
+2026-03-02T23:42:06 [INFO] Loaded dataset: ./data/partitioned/train.csv (39741 rows, 29 cols)
+2026-03-02T23:42:06 [INFO] Loaded dataset: ./data/partitioned/val.csv (12096 rows, 29 cols)
+2026-03-02T23:42:06 [INFO] Loaded dataset: ./data/partitioned/test.csv (25923 rows, 29 cols)
+2026-03-02T23:42:06 [INFO] Obs dim: 18 | Act dim: 7
+2026-03-02T23:42:06 [INFO] Safety shield enabled: mode=clip
+2026-03-02T23:42:06 [INFO] Converting dataset to transitions...

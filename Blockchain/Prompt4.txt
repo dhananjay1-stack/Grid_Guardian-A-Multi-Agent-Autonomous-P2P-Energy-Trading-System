@@ -1,0 +1,345 @@
+# Prompt — Implement Step 4: **Optimizer Trust Model & Disputability** (production-ready, VSCode → Hardhat → Pi/relayer integration)
+
+Step 3 (commit/reveal) is complete and verified. Now implement a secure, auditable, and economically-incentivized **off-chain optimizer + on-chain challenge/settlement** system that removes single-point-of-trust, enables reproducible matches, and lets participants challenge bad matches with financial disincentives for dishonest actors.
+
+
+
+---
+
+## High-level goals (what you will deliver)
+
+1. **MatchRegistry Smart Contract** — accepts signed `MatchResult` blobs from optimizers (single-signer, multi-signer, or threshold-signature), stores `matches`, locks a `challengeWindow`, and coordinates settlement via `TradingSC`/`CollateralSC`.
+2. **Multi-optimizer trust model** — support `k-of-n` signatures or an MPC/threshold-sig option (pluggable). Default: require `m-of-n` operator signers (where `n` OR operators are configured and at least `m` must sign).
+3. **Reproducible inputs** — require optimizer to publish `inputs_hash` (merkle root or sorted commit list hash) and (optionally) short proof that match respects constraints. `inputs_hash` allows anyone to reproduce and verify the run.
+4. **Challenge mechanism** — `challengeWindow` after match publication where any stakeholder may submit an `AlternativeMatch` along with a `challengeBond`. If challenge is accepted by on-chain adjudicator (automated checks or governance), challenger gets reward and offending optimizer(s) are slashed.
+5. **Slashing & bonds** — optimizers post a stake or bond before publishing results. Misbehavior causes partial/total slashing to fund challengers and pay dispute adjudicators.
+6. **Auditable trail** — store `match_blob_hash`, `inputs_hash`, `signatures`, and `txHash` for settlement. Indexer + off-chain storage keep full details, on-chain stores only hashes/metadata.
+7. **Tests & integration** — unit tests for MatchRegistry and dispute flows; integration tests: optimizer publishes match → no-challenge settlement; challenger posts alt → dispute resolved → slashing and settlement rerun.
+
+---
+
+## Design choices & parameters (recommended defaults)
+
+* `matchPublishBond`: default `100 USDC` (configurable via admin). Optimizer must stake before first publish.
+* `kOfN` signers: default `n = 3` operators, `k = 2` required. Start with 2-of-3.
+* `challengeWindow`: default `60` blocks (~15 minutes on test L2; adjust for pilot).
+* `challengeBond`: default `10 USDC` to deter frivolous challenges. Refund + reward on successful challenge.
+* `replayProtection`: include `roundId` + monotonic `matchNonce`.
+* `inputs_hash` format: `keccak256(abi.encodePacked(sorted_commit_hashes...))` or `merkleRoot` of the commit list. Include an ordered canonicalization rule.
+* `match_blob`: compressed (RLP/CBOR) or JSON stored off-chain and only `match_blob_hash` (bytes32) stored on-chain.
+* `gas model`: validators/adjudicators should run cheap checks on-chain; heavy verification off-chain and adjudicator signs a final attestation.
+
+---
+
+## Smart contracts to implement (skeletons + key functions)
+
+Files to add: `contracts/MatchRegistry.sol`, `contracts/OptimizerBond.sol` (or integrate into MatchRegistry), and `contracts/Adjudicator.sol` (optional).
+
+### 1) MatchRegistry.sol — core (solidity skeleton)
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.27;
+
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+interface ITradingSC {
+    function finalizeMatching(bytes32 matchHash, bytes calldata matchBlob) external;
+}
+interface ICollateralSC {
+    // used to lock/unlock optimizer bond and pay rewards
+    function depositBond(bytes32 optimizerId, uint256 amount) external;
+    function slashBond(bytes32 optimizerId, address to, uint256 amount) external;
+}
+
+contract MatchRegistry is AccessControl, ReentrancyGuard {
+    using ECDSA for bytes32;
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
+    IERC20 public stablecoin;
+    ITradingSC public tradingSC;
+    ICollateralSC public collateralSC;
+
+    uint256 public challengeWindowBlocks;
+    uint256 public matchPublishBond;     // required bond size
+
+    struct MatchMeta {
+        address publisher;       // relayer / optimizer address
+        bytes32 matchHash;       // keccak(matchBlob)
+        bytes32 inputsHash;      // commit list merkle root or sorted hash
+        uint256 publishedBlock;
+        uint256 publishNonce;    // monotonic per round
+        bool finalized;          // whether settlement triggered
+        uint8 signersCount;      // number of valid signatures attached
+        bytes signatures;        // concatenated signatures (off-chain validation)
+    }
+
+    // matchId => MatchMeta
+    mapping(bytes32 => MatchMeta) public matches; // key = matchHash
+
+    // optimizerId => bonded amount
+    mapping(bytes32 => uint256) public bonds;
+
+    // events
+    event MatchPublished(bytes32 indexed matchHash, bytes32 inputsHash, address indexed publisher, uint256 publishedBlock);
+    event MatchChallenged(bytes32 indexed matchHash, bytes32 indexed altMatchHash, address indexed challenger);
+    event MatchFinalized(bytes32 indexed matchHash, address indexed executor);
+
+    constructor(address _stablecoin, address _tradingSC, address _collateralSC, uint256 _challengeWindow, uint256 _matchBond) {
+        stablecoin = IERC20(_stablecoin);
+        tradingSC = ITradingSC(_tradingSC);
+        collateralSC = ICollateralSC(_collateralSC);
+        challengeWindowBlocks = _challengeWindow;
+        matchPublishBond = _matchBond;
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(ADMIN_ROLE, msg.sender);
+    }
+
+    // optimizer (or relayer) calls publishMatch after collecting signatures
+    function publishMatch(bytes32 matchHash, bytes32 inputsHash, bytes calldata signatures, bytes32 optimizerId) external nonReentrant {
+        require(matches[matchHash].publishedBlock == 0, "already published");
+
+        // require optimizer bonded with >= matchPublishBond
+        require(bonds[optimizerId] >= matchPublishBond, "insufficient bond");
+
+        // store metadata
+        matches[matchHash] = MatchMeta({
+            publisher: msg.sender,
+            matchHash: matchHash,
+            inputsHash: inputsHash,
+            publishedBlock: block.number,
+            publishNonce: 0,
+            finalized: false,
+            signersCount: 0,
+            signatures: signatures
+        });
+
+        emit MatchPublished(matchHash, inputsHash, msg.sender, block.number);
+    }
+
+    // allow anyone to challenge within the challenge window
+    function challengeMatch(bytes32 matchHash, bytes32 altMatchHash, bytes calldata evidence) external payable nonReentrant {
+        MatchMeta storage m = matches[matchHash];
+        require(m.publishedBlock != 0, "no such match");
+        require(block.number <= m.publishedBlock + challengeWindowBlocks, "challenge window closed");
+
+        // require a challenge bond (prevent spam)
+        require(msg.value >= 0, "no bond required in token model; replace with ERC20 bond if needed");
+
+        // on-chain light checks might be done here (e.g., verify inputsHash collision), heavier checks off-chain
+        emit MatchChallenged(matchHash, altMatchHash, msg.sender);
+
+        // push challenge to off-chain adjudicator workers via event logs
+    }
+
+    // after challenge window passes and no valid challenge, finalize
+    function finalizeMatch(bytes32 matchHash, bytes calldata matchBlob) external nonReentrant {
+        MatchMeta storage m = matches[matchHash];
+        require(m.publishedBlock != 0, "no such match");
+        require(block.number > m.publishedBlock + challengeWindowBlocks, "challenge window open");
+        require(!m.finalized, "already finalized");
+        // sanity: ensure keccak(matchBlob) == matchHash
+        require(keccak256(matchBlob) == matchHash, "match blob mismatch");
+
+        m.finalized = true;
+
+        // call tradingSC to trigger settlement (this may lock funds and schedule settlements)
+        tradingSC.finalizeMatching(matchHash, matchBlob);
+
+        emit MatchFinalized(matchHash, msg.sender);
+    }
+
+    // admin functions for bond management
+    function depositOptimizerBond(bytes32 optimizerId, uint256 amount) external {
+        // transfer stablecoin from caller into this contract (or collateralSC)
+        stablecoin.transferFrom(msg.sender, address(this), amount);
+        bonds[optimizerId] += amount;
+    }
+
+    function slashOptimizer(bytes32 optimizerId, address to, uint256 amount) external onlyRole(ADMIN_ROLE) {
+        require(bonds[optimizerId] >= amount, "insufficient");
+        bonds[optimizerId] -= amount;
+        stablecoin.transfer(to, amount);
+    }
+}
+```
+
+**Important:** This skeleton uses simple reentrancy protections and stores small metadata on-chain. The heavy verification and dispute resolution should be off-chain by default and be admissible evidence for on-chain slashing (signed attestations by a quorum of auditors, or on-chain adjudicator result).
+
+---
+
+## Off-chain components & flows
+
+1. **Optimizer cluster(s)** — one or more optimizer nodes compute matches using on-chain commits (from the indexer). They produce:
+
+   * `matchBlob` (deterministic serialization of matches: list of trades, prices, nonces)
+   * `inputsHash` — canonical hash of commit inputs (merkle root or sorted commit hashes)
+   * `matchHash = keccak256(matchBlob)`
+   * Each optimizer operator signs `matchHash` with EIP-712 `MatchResult` typed data. For multi-signature, collect `m-of-n` signatures.
+   * Optimizer publishes `matchBlob` off-chain (IPFS, S3, or aggregator) and calls `MatchRegistry.publishMatch(matchHash, inputsHash, signatures, optimizerId)` via relayer.
+
+2. **Indexer** — listens to `CommitPosted` events from `TradingSC` and builds canonical input lists per `roundId`. It provides the `sorted_commit_hashes` to optimizers and records `inputsHash` so matches are reproducible.
+
+3. **Auditor nodes / verifiers** — independent processes that can fetch `matchBlob` and `inputsHash`, reproduce the optimizer run deterministicly (or verify constraints) and optionally issue signed attestation of validity. If attestations exist, attach them to `publishMatch` signatures to strengthen trust.
+
+4. **Adjudicator service** — off-chain process that listens for `MatchChallenged` events, runs verification (reproduce optimizer, run alternate solver) and produces an on-chain attestation (signed by a multi-signer adjudicator key or by an on-chain vote) to resolve the challenge. The adjudicator result triggers `slashOptimizer` or `finalizeMatch` accordingly.
+
+---
+
+## Challenge & dispute mechanics (detailed)
+
+1. **Publication**
+
+   * Optimizer posts `matchHash` with `inputsHash` and signatures; the contract logs `MatchPublished`. `challengeWindow` begins.
+
+2. **Challenge**
+
+   * Any participant or indexer may submit `challengeMatch(matchHash, altMatchHash, evidence)`. They must post a `challengeBond` (ERC-20 or native).
+   * Event `MatchChallenged` emitted; off-chain adjudicators pick it up and start verification.
+
+3. **Adjudication**
+
+   * Off-chain adjudicators run deterministic verification:
+
+     * Check `inputsHash` matches the indexer’s canonical input set.
+     * Re-run optimizer or run a simpler but conservative validator (LP verification) to ensure no constraints broken (e.g., budget constraints, non-exceedance of available quantities).
+     * If the validator finds discrepancy, prepare `adjudicatorSignedAttestation` stating invalid match and the corrected `altMatchHash`.
+   * The adjudicator posts `adjudicationResult` to chain via a guarded on-chain function (or via `slashOptimizer` admin call if the system uses governance). For trust minimization, require a quorum of adjudicator signatures.
+
+4. **Resolution**
+
+   * If adjudicator confirms challenge:
+
+     * `slashOptimizer(optimizerId, challenger, reward)` transfers a portion of optimizer bond to challenger.
+     * `MatchRegistry` marks `matchHash` invalid and optionally allows the alternative match to be finalized (after ensuring it is valid).
+   * If adjudicator rejects challenge:
+
+     * Challenge bond is forfeited to publisher or burned; challenger punished.
+
+5. **Finalization**
+
+   * After the `challengeWindow` passes with no valid challenge, `finalizeMatch` can be called to invoke `TradingSC.finalizeMatching(matchHash, matchBlob)` which starts settlement.
+
+---
+
+## Signature & Typed Data formats
+
+* **MatchResult EIP-712 typed struct** (example):
+
+```js
+domain = { name: "GridGuardian-Match", version: "1", chainId, verifyingContract: MATCH_REGISTRY_ADDR }
+types = {
+  MatchResult: [
+    { name: "roundId", type: "uint32" },
+    { name: "matchHash", type: "bytes32" },
+    { name: "inputsHash", type: "bytes32" },
+    { name: "publishNonce", type: "uint256" },
+    { name: "timestamp", type: "uint256" }
+  ]
+}
+message = { roundId, matchHash, inputsHash, publishNonce, timestamp }
+```
+
+* Collect signer signatures: `wallet._signTypedData(domain, types, message)` for each operator.
+
+* **Adjudicator attestation** should likewise be an EIP-712 signed message with `matchHash`, `result` (valid/invalid), and `altMatchHash` if invalid.
+
+---
+
+## Tests & integration scenarios
+
+Add tests under `tests/matchregistry.test.js` and integration `scripts/integration/match_flow.js`.
+
+**Unit tests:**
+
+* publishMatch stores metadata and requires optimizer bond.
+* publishMatch rejects duplicate matchHash.
+* challengeMatch within window emits `MatchChallenged`.
+* finalizeMatch before window reverts; finalize after window calls `tradingSC.finalizeMatching`.
+* depositOptimizerBond and slashOptimizer mechanics.
+
+**Integration tests (3 scenarios):**
+
+1. **Happy path:** Optimizer publishes `matchHash`, no challenges within `challengeWindow`, `finalizeMatch` called → `TradingSC.finalizeMatching` called and settlement proceeds.
+2. **Valid challenge:** Optimizer publishes; challenger posts `challengeMatch` with evidence; off-chain adjudicator returns invalid attestation; `slashOptimizer` called; alternative match finalization proceeds. Verify bond decreases and challenger rewarded.
+3. **Frivolous challenge:** Challenger posts challenge but adjudicator rejects; challenger forfeits `challengeBond` (confirm transfer or burn).
+
+**End-to-end integration**: connect indexer → optimizer → matchregistry → tradingSC and run simulate flow similar to previous integration tests.
+
+---
+
+## Off-chain tooling & operational infra
+
+* **Optimizer infra**: containerized optimizer (Docker) with deterministic seeds & versioned binaries. Publish binary version and checksum; store `optimizer_version` and binary hash in MatchRegistry metadata for audit.
+* **Indexers**: TheGraph or custom indexer (Node + Postgres) that stores `CommitPosted` events grouped by `roundId`. Indexer exposes `GET /round/:roundId/inputs` returning canonical `sorted_commit_hashes` and `inputsHash`.
+* **Adjudicator cluster**: cloud workers (3 or 5 nodes) that sign attestations after deterministic verification. Use threshold signing or multi-sign extra protection.
+* **Storage**: IPFS or S3 for full `matchBlob`. On-chain store only `matchHash` + `inputsHash` + signatures.
+* **Monitoring & Alerts**: Grafana/Prometheus for failed matches, challenge rates, optimizer uptime, bond levels.
+
+---
+
+## Security & game-theory considerations
+
+* **Incentives**: Optimizer bond > (expected damage from a single bad match) so honest behavior is economically favorable.
+* **Slashing thresholds**: partial slashes for minor errors, full slashes for provable fraud. Define precise penalty schedule on-chain (or in governance).
+* **Collusion resistance**: require `m-of-n` signers from independent organizations to publish matches; diversify operator ownership.
+* **Replay protection**: include `roundId` and `publishNonce` in signed MatchResult. Nonces enforced per `roundId` in registry.
+* **Transparency**: publish `inputsHash` and make indexer canonical ordering deterministic; make optimizer code and seeds auditable for research/pilots.
+
+---
+
+## VSCode tasks & scripts to add
+
+* `scripts/deploy_matchregistry.js` — deploy MatchRegistry and link to TradingSC & CollateralSC.
+* `relayer/publishMatch.js` — sign and call `publishMatch` (collect signatures or simulate `m-of-n`).
+* `scripts/integration/match_flow.js` — run indexer → optimizer (mock) → publish → optionally challenge → finalize.
+* `.vscode/tasks.json` entries: Start Hardhat, Deploy Contracts, Run match_flow integration script, Run adjudicator mock.
+
+---
+
+## Deliverables (what to commit / PR)
+
+1. `contracts/MatchRegistry.sol` (+ NatSpec) and optional `Adjudicator.sol`.
+2. `scripts/deploy_matchregistry.js`.
+3. `relayer/publishMatch.js` and `relayer/submitChallenge.js`.
+4. `indexer/` endpoint that produces `inputsHash` (simple Node + Postgres or TheGraph manifest).
+5. `adjudicator/` mock service that listens for `MatchChallenged` events and returns attestation (for tests).
+6. `tests/matchregistry.test.js` and integration scripts `scripts/integration/match_flow.js`.
+7. README update describing the optimizer/quorum policy and how to add operator keys.
+8. VSCode tasks for the full flow.
+
+---
+
+## Verification checklist (what to check after implementation)
+
+* [ ] MatchRegistry deployed and linked to TradingSC/CollateralSC.
+* [ ] Optimizer can deposit bond before publishing.
+* [ ] `publishMatch` stores `matchHash` + `inputsHash` and emits `MatchPublished`.
+* [ ] `challengeMatch` accepted within `challengeWindow`; `MatchChallenged` event emitted.
+* [ ] Off-chain adjudicator can pick up `MatchChallenged` and submit an attestation (simulate in tests).
+* [ ] On valid adjudication, `slashOptimizer` decreases optimizer bond and pays challenger.
+* [ ] On no challenge within `challengeWindow`, `finalizeMatch` triggers `TradingSC.finalizeMatching` and settlement.
+* [ ] Tests cover replay, duplicate publish, incorrect inputsHash, and slashing flows.
+* [ ] Indexer returns canonical `inputsHash` equals the one optimizer used (prove reproducible).
+* [ ] System supports both `m-of-n` multi-signature and a single-signer fallback in dev.
+
+---
+
+## Suggested first sub-task (do this now)
+
+1. Add `MatchRegistry.sol` skeleton (as above) and unit tests for `publishMatch`, `challengeMatch`, and `finalizeMatch`.
+2. Add a mock adjudicator that simply returns “invalid” when an altMatchHash conflicts with inputsHash to exercise slashing logic.
+3. Add `relayer/publishMatch.js` to sign & call `publishMatch` using the relayer account (simulate collecting `m-of-n` signatures by signing matchHash with test keys).
+
+---
+
+If you want I can immediately **generate** one of these now:
+
+* (A) Full `contracts/MatchRegistry.sol` (solidity) + `deploy_matchregistry.js`.
+* (B) `relayer/publishMatch.js` + `relayer/submitChallenge.js` (node scripts).
+* (C) `adjudicator/mock_adjudicator.js` + integration `scripts/integration/match_flow.js`.
+
+Pick A, B, or C and I’ll produce the code & tests now.

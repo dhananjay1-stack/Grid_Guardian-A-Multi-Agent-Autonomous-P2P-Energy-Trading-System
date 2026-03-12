@@ -1,0 +1,89 @@
+{
+  "description": "Grid Guardian Unified Final Dataset \u2014 collected + generated + fixed",
+  "created_utc": "2026-02-27T21:06:40.680492+00:00",
+  "total_rows": 77760,
+  "columns": [
+    "ts",
+    "household_id",
+    "pv_gen_kw",
+    "load_kw",
+    "net_kw",
+    "soc_kwh",
+    "soc_capacity_kwh",
+    "battery_power_kw",
+    "price_signal",
+    "forecast_irradiance_1h",
+    "forecast_irradiance_3h",
+    "forecast_temp_1h",
+    "actual_irradiance_wm2",
+    "voltage_v",
+    "current_a",
+    "offer_id",
+    "offered_kwh",
+    "offer_price",
+    "trade_id",
+    "commit_hash",
+    "event_flag",
+    "reward",
+    "safety_violation",
+    "voltage_v_synth_flag",
+    "current_a_synth_flag"
+  ],
+  "households": [
+    "ev_owner_01",
+    "family_home_01",
+    "small_apartment_01"
+  ],
+  "date_range": {
+    "start": "2025-01-01T00:00:00Z",
+    "end": "2025-03-31T23:55:00Z"
+  },
+  "per_household": {
+    "ev_owner_01": {
+      "rows": 25920,
+      "pv_gen_kw_mean": 0.816619,
+      "load_kw_mean": 0.694462,
+      "soc_kwh_min": 1.0,
+      "soc_kwh_max": 9.8,
+      "offer_count": 5896,
+      "trade_count": 513
+    },
+    "family_home_01": {
+      "rows": 25920,
+      "pv_gen_kw_mean": 0.478828,
+      "load_kw_mean": 0.544577,
+      "soc_kwh_min": 0.6,
+      "soc_kwh_max": 5.9,
+      "offer_count": 2511,
+      "trade_count": 40
+    },
+    "small_apartment_01": {
+      "rows": 25920,
+      "pv_gen_kw_mean": 0.154248,
+      "load_kw_mean": 0.320296,
+      "soc_kwh_min": 0.4,
+      "soc_kwh_max": 2.538,
+      "offer_count": 2761,
+      "trade_count": 6
+    }
+  },
+  "offers_total": 11168,
+  "trades_total": 559,
+  "acceptance_rate": 0.0501,
+  "synthetic_offers": 2761,
+  "synthetic_trades": 549,
+  "mass_balance_max_error": 4.44e-16,
+  "safety_violations": 0,
+  "voltage_synthetic_pct": 100.0,
+  "sources": {
+    "collected": "collected_data.csv.gz",
+    "generated_fixed": "final_dataset.csv.gz",
+    "offers": "offers.csv.gz",
+    "trades": "trades.csv.gz"
+  },
+  "file_checksums": {
+    "final_dataset": "867c76bd6cb4653f0ab2ce8dbec53db8c87ba70104984f80d1634dee388dd811",
+    "offers": "a3bc65c06d59ff5facaaca4c8269d2409985c947455772298314e21cf1d6b8e7",
+    "trades": "3b3a1c573e5db912a48e5c4c8d6e51d2e8a8be81c9e926ee7f0eb20efa67e6f7"
+  }
+}

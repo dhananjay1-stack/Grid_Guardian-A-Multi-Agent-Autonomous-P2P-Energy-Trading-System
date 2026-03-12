@@ -1,0 +1,33 @@
+# ============================================================================
+# example_fix_config.yaml — Grid Guardian Dataset Fixer Configuration
+# ============================================================================
+
+fixer:
+  seed: 42
+  round_digits: 9
+  target_acceptance: 0.05           # 5% acceptance rate
+
+autotune:
+  min_offers_threshold: 10          # households below this get autotuned
+  soc_margin_for_offer: 0.05        # small SoC margin above soc_min to trigger offer
+  offer_price_markup: 0.88          # 12% below utility price (competitive)
+  min_offer_kwh_relaxed: 0.01       # relaxed minimum offer size (kWh)
+  max_iterations: 100               # max autotune loop steps
+
+reprice:
+  price_step: 0.05                  # reduce offer_price by 5% per iteration
+  max_iterations: 50                # max price reduction iterations per offer
+  strategy: price_below_utility     # price_below_utility | probabilistic
+  sigmoid_a: 3.0                    # used only for probabilistic strategy
+
+voltage_current:
+  default_nominal_voltage_v: 230.0  # default if not in generator_config.yaml
+  plausibility_threshold: 0.30      # 30% difference triggers plausibility_warning
+
+salt:
+  salt_length_bytes: 16
+  force_regenerate_missing: true    # generate salt for offers missing one
+
+backup:
+  enabled: true
+  base_path: "./data/backup"

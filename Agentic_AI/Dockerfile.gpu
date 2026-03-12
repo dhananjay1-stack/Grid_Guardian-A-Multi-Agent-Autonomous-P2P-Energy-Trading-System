@@ -1,0 +1,22 @@
+# ──────────────────────────────────────────────────────────────────
+# Grid-Guardian RL — GPU Dockerfile
+# ──────────────────────────────────────────────────────────────────
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.10 python3-pip build-essential git && \
+    ln -s /usr/bin/python3.10 /usr/bin/python && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["python", "train_rl_agents.py", \
+     "--config", "configs/train_rl.yaml", \
+     "--algo", "CQL", "--mode", "offline", \
+     "--device", "cuda:0", "--seed", "42"]

@@ -1,0 +1,20 @@
+{
+  "actual_irradiance_wm2": {
+    "ks_statistic": 0.119599,
+    "ks_p_value": 0.0,
+    "wasserstein_distance": 58.853787,
+    "drift_detected": true
+  },
+  "pv_gen_kw": {
+    "ks_statistic": 0.060391,
+    "ks_p_value": 0.0,
+    "wasserstein_distance": 0.129014,
+    "drift_detected": true
+  },
+  "load_kw": {
+    "ks_statistic": 0.004038,
+    "ks_p_value": 0.907845,
+    "wasserstein_distance": 0.001797,
+    "drift_detected": false
+  }
+}

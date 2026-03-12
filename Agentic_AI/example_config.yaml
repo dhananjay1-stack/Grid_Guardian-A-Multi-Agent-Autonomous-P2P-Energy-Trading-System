@@ -1,0 +1,44 @@
+# Grid Guardian — Data Collection Configuration
+# ===============================================
+# This YAML file can be passed via --config to data_collection.py
+# CLI arguments override values set here.
+
+# Location (Pune, India)
+lat: 18.5204
+lon: 73.8567
+
+# Date range
+start: "2025-01-01"
+end: "2025-03-31"
+
+# Resampling timestep in minutes (allowed: 1, 5, 15, 60)
+timestep: 5
+
+# Data source: 'nasa_power' (default) or 'era5'
+source: nasa_power
+
+# Output
+out: ./data/collected
+format: csv            # csv (gzipped) or parquet
+
+# Reproducibility
+seed: 42
+
+# Timezone of the location
+tz: Asia/Kolkata
+
+# Optional: intra-hour stochastic irradiance noise (0 = off)
+irradiance_noise: 0.0
+
+# Float precision for CSV output
+float_precision: 6
+
+# Local sensors (set to true and provide sensors-config to enable)
+include_local_sensors: false
+sensors_config: sensors.yaml
+
+# Dry-run mode (validations only, no output written)
+dry_run: false
+
+# Optional: path to sample households JSON for join testing
+# sample_households: sample_households.json

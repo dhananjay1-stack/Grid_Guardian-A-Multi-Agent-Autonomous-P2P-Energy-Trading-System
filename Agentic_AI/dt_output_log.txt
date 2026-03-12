@@ -1,0 +1,55 @@
+2026-03-03T23:39:39 [INFO] ======================================================================
+2026-03-03T23:39:39 [INFO]   Grid-Guardian RL Training Pipeline v1.0.0
+2026-03-03T23:39:39 [INFO]   Algorithm: DT | Mode: offline | Seed: 42 | Device: cpu
+2026-03-03T23:39:39 [INFO] ======================================================================
+2026-03-03T23:39:39 [INFO] Random seed set to 42 (deterministic=True)
+2026-03-03T23:39:40 [INFO] Loaded dataset: ./data/partitioned/train.csv (39741 rows, 29 cols)
+2026-03-03T23:39:40 [INFO] Loaded dataset: ./data/partitioned/val.csv (12096 rows, 29 cols)
+2026-03-03T23:39:40 [INFO] Loaded dataset: ./data/partitioned/test.csv (25923 rows, 29 cols)
+2026-03-03T23:39:40 [INFO] Obs dim: 18 | Act dim: 7
+2026-03-03T23:39:40 [INFO] Safety shield enabled: mode=clip
+2026-03-03T23:39:40 [INFO] Converting dataset to transitions...
+2026-03-03T23:39:53 [INFO] Transitions: 39738
+2026-03-03T23:39:53 [INFO] Replay buffer: 39738 transitions
+2026-03-03T23:39:53 [INFO] Training BC baseline for behavior policy estimation...
+2026-03-03T23:40:12 [INFO] BC epoch 10/30  train_loss=0.1887
+2026-03-03T23:40:22 [INFO] BC epoch 20/30  train_loss=0.1221
+2026-03-03T23:40:33 [INFO] BC epoch 30/30  train_loss=0.1066
+2026-03-03T23:40:33 [INFO] BC model saved to models\BC\run_42\checkpoint_best.pt
+2026-03-03T23:40:33 [INFO] BC baseline trained and saved
+2026-03-03T23:40:33 [INFO] Agent created: DT
+2026-03-03T23:40:33 [INFO] Building trajectory sequences for Decision Transformer...
+2026-03-03T23:40:42 [INFO] Trajectories: 3306 sequences of length 24
+2026-03-03T23:40:42 [INFO] TensorBoard logging to logs\DT\DT_42_1772561379
+2026-03-03T23:40:42 [INFO] Starting DT training in offline mode...
+2026-03-03T23:40:42 [INFO] DT training: 1 epochs, 3306 trajectories
+C:\Users\DELL\Grid_Guardian\Agentic_AI\venv\Lib\site-packages\torch\nn\modules\transformer.py:431: UserWarning: Support for mismatched src_key_padding_mask and mask is deprecated. Use same type for both instead.
+  src_key_padding_mask = F._canonical_mask(
+2026-03-03T23:42:59 [INFO] DT epoch 1/1  loss=1.459780
+2026-03-03T23:45:41 [INFO] DT model saved to models\DT\run_42\checkpoint_best.pt
+2026-03-03T23:45:42 [INFO] DT model saved to models\DT\run_42\checkpoint_final.pt
+2026-03-03T23:45:42 [INFO] Training complete in 299.1 seconds
+2026-03-03T23:45:42 [INFO] Running final evaluation...
+2026-03-03T23:48:07 [INFO] Safety shield: 10000 incidents total
+2026-03-03T23:48:24 [INFO] Final eval: mean_reward=-12485.6640  safety_rate=0.5001  CVaR=-18643.2980
+2026-03-03T23:51:06 [INFO] Action distribution drift: kl=1.6994  js=0.1070  tvd=0.2141
+2026-03-03T23:51:06 [INFO] Running stress tests...
+2026-03-03T23:51:06 [INFO] Stress test: cloud_ramp
+2026-03-03T23:55:01 [INFO]   cloud_ramp: reward=-9092.8777  safety_rate=0.262065
+2026-03-03T23:55:01 [INFO] Stress test: grid_outage
+2026-03-03T23:57:09 [INFO] Safety shield: 20000 incidents total
+2026-03-03T23:58:49 [INFO]   grid_outage: reward=-8892.8777  safety_rate=0.122440
+2026-03-03T23:58:49 [INFO] Stress test: sensor_dropout
+2026-03-04T00:02:50 [INFO]   sensor_dropout: reward=-9207.8777  safety_rate=0.250492
+2026-03-04T00:02:50 [INFO] Running OPE: ['IS', 'WIS']
+2026-03-04T00:03:51 [INFO] OPE results: {'IS': '0.0000 [0.0000, 0.0000]', 'WIS': '0.0000 [0.0000, 0.0000]'}
+2026-03-04T00:03:51 [INFO] Eval summary saved to eval\DT\eval_summary.json
+2026-03-04T00:03:53 [INFO] Learning curves saved to eval\DT\eval_plots
+2026-03-04T00:03:53 [INFO] OPE results saved to ope\DT
+2026-03-04T00:03:53 [INFO] Safety shield summary: {'total_incidents': 25699, 'logged_incidents': 25699, 'modes': {'clip': 25699, 'fallback': 0, 'reject': 0}}
+2026-03-04T00:03:53 [INFO] ======================================================================
+2026-03-04T00:03:53 [INFO]   TRAINING COMPLETE ΓÇö DT
+2026-03-04T00:03:53 [INFO]   Final reward: -12485.6640 | Safety rate: 0.500083
+2026-03-04T00:03:53 [INFO]   Model: models\DT\run_42
+2026-03-04T00:03:53 [INFO]   Logs:  logs\DT\DT_42_1772561379
+2026-03-04T00:03:53 [INFO] ======================================================================
