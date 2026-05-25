@@ -1,0 +1,130 @@
+{
+  "version": "2.0",
+  "description": "Condition-to-model routing configuration for Grid-Guardian edge with BC/CQL/DT policy selection",
+  "default_model": "cql_policy",
+  "default_runtime": "onnx",
+  "models": {
+    "bc_policy": {
+      "name": "GridGuardian-BC",
+      "torchscript": "bc_policy.torchscript",
+      "onnx": "bc_policy.onnx",
+      "norm_params": "norm_params_bc.npz",
+      "obs_dim": 18,
+      "act_dim": 7,
+      "description": "Behavior Cloning baseline - safe fallback for degraded/risky conditions"
+    },
+    "cql_policy": {
+      "name": "GridGuardian-CQL",
+      "torchscript": "cql_policy.torchscript",
+      "onnx": "cql_policy.onnx",
+      "norm_params": "norm_params.npz",
+      "obs_dim": 18,
+      "act_dim": 7,
+      "description": "CQL offline RL policy - conservative approach for uncertain conditions"
+    },
+    "dt_policy": {
+      "name": "GridGuardian-DT",
+      "torchscript": "dt_policy.torchscript",
+      "onnx": "dt_policy.onnx",
+      "norm_params": "norm_params_dt.npz",
+      "obs_dim": 18,
+      "act_dim": 7,
+      "description": "Decision Transformer - long-horizon planning for stable conditions"
+    }
+  },
+  "conditions": {
+    "normal": {
+      "model": "dt_policy",
+      "description": "Normal/stable operation - use long-horizon DT planning",
+      "priority": 1
+    },
+    "high_pv": {
+      "model": "cql_policy",
+      "description": "High solar generation - conservative export decisions",
+      "priority": 2
+    },
+    "high_load": {
+      "model": "cql_policy",
+      "description": "High load demand - conservative import/discharge",
+      "priority": 2
+    },
+    "low_soc": {
+      "model": "bc_policy",
+      "description": "Low battery state - safe conservative operation",
+      "priority": 3
+    },
+    "peak_price": {
+      "model": "cql_policy",
+      "description": "Peak pricing period - conservative export maximization",
+      "priority": 2
+    },
+    "off_peak": {
+      "model": "dt_policy",
+      "description": "Off-peak pricing - long-horizon charge planning",
+      "priority": 1
+    },
+    "fault": {
+      "model": "bc_policy",
+      "description": "Fault condition - safe mode with BC fallback",
+      "priority": 10
+    },
+    "degraded": {
+      "model": "bc_policy",
+      "description": "Degraded sensors/anomalies - safe baseline policy",
+      "priority": 8
+    },
+    "stress_test": {
+      "model": "bc_policy",
+      "description": "Stress test mode - safe baseline policy",
+      "priority": 9
+    }
+  },
+  "condition_thresholds": {
+    "high_pv_kw": 2.5,
+    "high_load_kw": 2.0,
+    "low_soc_fraction": 0.15,
+    "peak_price_threshold": 6.5,
+    "off_peak_price_threshold": 4.0,
+    "voltage_min": 190,
+    "voltage_max": 250,
+    "current_max": 25,
+    "sensor_health_low": 0.7,
+    "anomaly_score_high": 0.6,
+    "volatility_high": 0.5,
+    "risk_score_high": 0.6
+  },
+  "policy_selection_rules": {
+    "stable": {
+      "conditions": ["normal", "off_peak"],
+      "volatility_max": 0.2,
+      "forecast_confidence_min": 0.8,
+      "policy": "dt_policy",
+      "reason": "stable_condition_long_horizon_planning"
+    },
+    "uncertain": {
+      "conditions": ["high_pv", "high_load", "peak_price"],
+      "volatility_max": 0.5,
+      "forecast_confidence_min": 0.4,
+      "policy": "cql_policy",
+      "reason": "uncertain_condition_conservative_policy"
+    },
+    "risky": {
+      "conditions": ["low_soc", "fault", "degraded", "stress_test"],
+      "volatility_max": 1.0,
+      "forecast_confidence_min": 0.0,
+      "policy": "bc_policy",
+      "reason": "risky_condition_safe_fallback"
+    }
+  },
+  "runtime_preferences": {
+    "raspberry_pi": "onnx",
+    "desktop": "torchscript",
+    "default": "onnx"
+  },
+  "fallback_behavior": {
+    "model_load_failure": "use_rules",
+    "inference_failure": "hold",
+    "invalid_input": "hold",
+    "fallback_policy": "bc_policy"
+  }
+}

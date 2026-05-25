@@ -1,0 +1,63 @@
+# Grid-Guardian Edge Module Requirements
+# Install with: pip install -r requirements.txt
+
+# =============================================================================
+# Core dependencies
+# =============================================================================
+python-dotenv>=1.0.0   # Environment variable management from .env files
+pyserial==3.5          # Serial communication with PZEM sensor
+requests==2.31.0       # HTTP client for backend APIs
+
+# MQTT support (optional but recommended)
+paho-mqtt==1.6.1       # MQTT client for real-time communication
+
+# =============================================================================
+# AI Inference dependencies (for local model inference)
+# =============================================================================
+numpy>=1.24.0          # Numerical computing for observations
+
+# ONNX Runtime - Preferred for Raspberry Pi (faster on ARM64)
+# Install with: pip install onnxruntime
+onnxruntime>=1.16.0    # ONNX model inference runtime
+
+# PyTorch - Alternative inference backend (optional)
+# For Raspberry Pi, install with:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Uncomment if using TorchScript models:
+# torch>=2.0.0
+
+# =============================================================================
+# Raspberry Pi GPIO
+# =============================================================================
+# RPi.GPIO is pre-installed on Raspberry Pi OS
+# Uncomment if installing from scratch:
+# RPi.GPIO==0.7.1
+
+# smbus2 for I2C sensors (optional)
+# smbus2==0.4.3
+
+# =============================================================================
+# Development/testing dependencies (optional)
+# =============================================================================
+# pytest==7.4.0
+# pytest-mock==3.11.1
+# pytest-cov==4.1.0
+
+# =============================================================================
+# Installation notes for Raspberry Pi 5
+# =============================================================================
+# 1. Create virtual environment:
+#    python3 -m venv venv
+#    source venv/bin/activate
+#
+# 2. Install dependencies:
+#    pip install -r requirements.txt
+#
+# 3. For PyTorch on ARM64 (optional):
+#    pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# 4. Verify ONNX Runtime:
+#    python -c "import onnxruntime; print(onnxruntime.__version__)"
+#
+# 5. Run edge runtime:
+#    python edge_runtime.py --test

@@ -1,0 +1,56 @@
+[Unit]
+Description=Grid-Guardian Edge Runtime
+Documentation=https://github.com/grid-guardian/edge
+After=network.target network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=gpio
+
+# Working directory
+WorkingDirectory=/home/pi/grid_guardian_edge
+
+# Python virtual environment
+Environment="PATH=/home/pi/grid_guardian_edge/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Node configuration - CHANGE THESE FOR YOUR DEPLOYMENT
+Environment="NODE_ID=gg-node-01"
+Environment="BACKEND_URL=http://YOUR_BACKEND_IP:3000"
+Environment="MQTT_BROKER=YOUR_MQTT_BROKER_IP"
+Environment="MQTT_ENABLED=true"
+Environment="LOG_LEVEL=INFO"
+
+# Serial port configuration
+Environment="SERIAL_PORT=/dev/serial0"
+Environment="BAUD_RATE=9600"
+
+# GPIO configuration
+Environment="RELAY_PIN=17"
+
+# Main process
+ExecStart=/home/pi/grid_guardian_edge/venv/bin/python3 /home/pi/grid_guardian_edge/edge_runtime.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gridguardian-edge
+
+# Resource limits
+MemoryMax=256M
+CPUQuota=50%
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/var/log
+
+[Install]
+WantedBy=multi-user.target
