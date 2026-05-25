@@ -1,9 +1,0 @@
-node_modules/
-artifacts/
-cache/
-typechain-types/
-.env
-pi-client/keystore/
-offchain-registry/venv/
-coverage/
-coverage.json
