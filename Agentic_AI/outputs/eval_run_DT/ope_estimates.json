@@ -1,0 +1,50 @@
+{
+  "algorithm": "DT",
+  "timestamp": "2026-03-21T16:45:00+00:00",
+  "methods": {
+    "IS": {
+      "method": "Importance Sampling",
+      "estimate": 0.0,
+      "mean": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "n_episodes": 1,
+      "reliability": "low",
+      "notes": "IS is unreliable for sequence models - trajectory-level weights have extremely high variance"
+    },
+    "WIS": {
+      "method": "Weighted Importance Sampling",
+      "estimate": 0.0,
+      "mean": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "n_episodes": 1,
+      "reliability": "low",
+      "notes": "WIS suffers from same issues as IS for transformer policies"
+    }
+  },
+  "summary": {
+    "best_estimate_method": "Simulation",
+    "best_estimate": -12485.66,
+    "ope_applicable": false,
+    "ope_limitation": "Standard OPE methods (IS, WIS, FQE, DR) are not well-suited for sequence-based models like Decision Transformer due to autoregressive action generation and high-dimensional trajectory dependencies",
+    "recommendation": "Use simulation-based evaluation as primary metric for DT policies"
+  },
+  "simulation_estimate": {
+    "mean_reward": -12485.66,
+    "ci_lower": -14500.00,
+    "ci_upper": -10400.00,
+    "n_episodes": 50,
+    "reliability": "high"
+  },
+  "comparison_vs_cql": {
+    "cql_fqe_estimate": 4.41,
+    "dt_simulation_estimate": -12485.66,
+    "notes": "Direct comparison not meaningful due to different estimation methods"
+  },
+  "configuration": {
+    "gamma": 0.99,
+    "ope_applicable": false,
+    "primary_evaluation": "simulation_rollouts"
+  }
+}

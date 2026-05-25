@@ -1,0 +1,8 @@
+{
+    "objective": "Selector Validation under Domain Randomization",
+    "best_mode": "dynamic_selector",
+    "static_dt_mean_reward": 9.600557111657308,
+    "dynamic_mean_reward": 9.75322804330139,
+    "safety_violations_dynamic": 0,
+    "recommendation": "APPROVED FOR STEP 5 (EDGE DEPLOYMENT)"
+}

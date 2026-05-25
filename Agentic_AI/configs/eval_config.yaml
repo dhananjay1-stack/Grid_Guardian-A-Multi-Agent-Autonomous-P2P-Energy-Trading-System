@@ -1,0 +1,201 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Grid-Guardian  Step 3: Robust Evaluation & Safety Testing Config  (eval_config.yaml)
+# ──────────────────────────────────────────────────────────────────────────────
+
+mode: eval
+
+model:
+  algo: CQL
+  checkpoint_path: models/CQL/run_42/checkpoint_best.pt
+  device: cpu
+
+data:
+  dataset_path: data/partitioned/test.csv
+  train_dataset_path: data/partitioned/train.csv
+  val_dataset_path: data/partitioned/val.csv
+  split: test
+  preserve_temporal_order: true
+
+env:
+  name: GridGuardian-v0
+  history_length: 24
+  timestep_min: 5
+  households:
+    - small_apartment_01
+    - family_home_01
+    - ev_owner_01
+  observation_keys:
+    - soc_kwh
+    - soc_capacity_kwh
+    - pv_gen_kw
+    - load_kw
+    - net_kw
+    - battery_power_kw
+    - price_signal
+    - forecast_irradiance_1h
+    - forecast_irradiance_3h
+    - forecast_temp_1h
+    - actual_irradiance_wm2
+    - voltage_v
+    - current_a
+  time_features: true
+  neighbor_balance: true
+  action_type: discrete
+  discrete_actions:
+    - charge_small
+    - charge_large
+    - idle
+    - discharge_small
+    - discharge_large
+    - offer_sell
+    - offer_hold
+  safety:
+    soc_min_frac: 0.10
+    soc_max_frac: 0.95
+    max_charge_kw: 3.0
+    max_discharge_kw: 3.0
+    max_grid_draw_kw: 5.0
+
+evaluation:
+  num_eval_episodes: 50
+  max_steps_per_episode: 10000
+  seed: 42
+  metrics:
+    - reward_mean
+    - reward_variance
+    - reward_min
+    - reward_p5
+    - reward_p1
+    - total_cost
+    - energy_savings
+    - soc_mean
+    - soc_violations
+    - peak_grid_draw
+    - action_divergence
+
+ope:
+  enabled: true
+  methods: [IS, WIS, FQE, DR]
+  fqe_steps: 50000
+  bootstrap_samples: 200
+  confidence_level: 0.95
+
+risk:
+  compute_cvar: true
+  alpha: 0.05
+  worst_percentile: [1, 5]
+
+stress_testing:
+  enabled: true
+  episodes_per_scenario: 10
+  scenarios:
+    - name: cloud_ramp
+      description: "Sudden cloud coverage causing PV generation drop"
+      irradiance_noise_std: 0.5
+      enabled: true
+    - name: low_generation
+      description: "Prolonged period of minimal solar generation"
+      irradiance_multiplier: 0.1
+      duration_hours: 6
+      enabled: true
+    - name: grid_outage
+      description: "Complete grid disconnection event"
+      grid_available: false
+      duration_hours: 2
+      enabled: true
+    - name: grid_restore
+      description: "Grid restoration after outage"
+      grid_restore_event: true
+      enabled: true
+    - name: inverter_degradation
+      description: "Inverter efficiency drop to 75%"
+      inverter_eff_range: [0.70, 0.78]
+      enabled: true
+    - name: sensor_dropout
+      description: "Random sensor failures"
+      sensor_dropout_prob: 0.3
+      enabled: true
+    - name: forecast_error
+      description: "Large forecast prediction errors"
+      forecast_noise_std: 0.4
+      enabled: true
+    - name: load_surge
+      description: "Sudden load spike beyond training range"
+      load_multiplier: 2.5
+      enabled: true
+    - name: tariff_spike
+      description: "Extreme electricity price volatility"
+      tariff_shift_range: [-2.0, 3.0]
+      enabled: true
+    - name: soc_extremes
+      description: "Battery SoC near min/max limits"
+      force_soc_extremes: true
+      enabled: true
+    - name: communication_delay
+      description: "Delayed observation updates"
+      latency_ms: [500, 1000]
+      enabled: true
+
+safety:
+  check_constraints: true
+  shield_enabled: true
+  shield_mode: clip
+  constraints:
+    min_soc: 0.10
+    max_soc: 0.95
+    max_charge_kw: 3.0
+    max_discharge_kw: 3.0
+    max_grid_draw_kw: 5.0
+  log_violations: true
+  violation_categories:
+    - soft  # recoverable violations
+    - hard  # dangerous violations
+    - near_miss  # prevented by shield
+
+ablation:
+  enabled: true
+  variants:
+    - name: no_domain_rand
+      description: "Without domain randomization"
+      domain_randomization: false
+    - name: weak_noise
+      description: "With reduced noise"
+      forecast_noise_std: 0.05
+      irradiance_noise_std: 0.03
+    - name: strong_noise
+      description: "With increased noise"
+      forecast_noise_std: 0.25
+      irradiance_noise_std: 0.20
+    - name: reduced_forecast
+      description: "With degraded forecast quality"
+      forecast_noise_std: 0.35
+    - name: delayed_action
+      description: "With 200ms action delay"
+      latency_ms: [150, 250]
+    - name: strict_safety
+      description: "With stricter safety thresholds"
+      soc_min_frac: 0.20
+      soc_max_frac: 0.85
+
+behavior_drift:
+  enabled: true
+  n_actions: 7
+  thresholds:
+    kl_warning: 1.0
+    kl_critical: 2.0
+    tvd_warning: 0.25
+    tvd_critical: 0.40
+
+output:
+  save_plots: true
+  save_logs: true
+  export_json: true
+  log_dir: outputs/eval_run
+  output_dir: outputs/eval_run
+
+deployment_criteria:
+  safety_violation_threshold: 0.01
+  worst_case_reward_threshold: -50000
+  cvar_threshold: -40000
+  stability_threshold: 0.20
+  conservatism_threshold: 2.0

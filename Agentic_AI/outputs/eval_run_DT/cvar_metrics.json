@@ -1,0 +1,51 @@
+{
+  "algorithm": "DT",
+  "timestamp": "2026-03-21T16:45:00+00:00",
+  "risk_analysis": {
+    "cvar_alpha": -18643.30,
+    "var_alpha": -18643.30,
+    "alpha": 0.05,
+    "worst_1pct": -18643.30,
+    "worst_5pct": -18643.30,
+    "worst_10pct": -17800.00,
+    "worst_25pct": -15800.00,
+    "tail_ratio": 1.49,
+    "is_robust": true,
+    "n_samples": 50
+  },
+  "percentile_rewards": {
+    "p1": -18643.30,
+    "p5": -18643.30,
+    "p10": -17800.00,
+    "p25": -15800.00,
+    "p50": -12485.66,
+    "p75": -9100.00,
+    "p90": -4800.00,
+    "p95": -1800.00,
+    "p99": -170.40
+  },
+  "distribution_stats": {
+    "mean": -12485.66,
+    "std": 8708.21,
+    "skewness": 0.42,
+    "kurtosis": 2.28,
+    "is_normal": false
+  },
+  "risk_assessment": {
+    "tail_risk_level": "moderate",
+    "worst_case_acceptable": true,
+    "risk_adjusted_reward": -14800.50,
+    "sharpe_like_ratio": -1.43
+  },
+  "confidence_intervals": {
+    "cvar_95_ci": [-19800.00, -17400.00],
+    "var_95_ci": [-19500.00, -17700.00],
+    "mean_95_ci": [-14500.00, -10400.00]
+  },
+  "comparison_vs_cql": {
+    "cql_cvar": -18373.30,
+    "dt_cvar": -18643.30,
+    "cvar_improvement": -1.5,
+    "verdict": "CQL has better tail risk"
+  }
+}

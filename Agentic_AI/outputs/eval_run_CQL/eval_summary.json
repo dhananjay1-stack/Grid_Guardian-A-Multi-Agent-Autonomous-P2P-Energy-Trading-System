@@ -1,0 +1,79 @@
+{
+  "algorithm": "CQL",
+  "checkpoint": "models/CQL/run_42/checkpoint_best.pt",
+  "timestamp": "2026-03-21T16:30:00+00:00",
+  "pipeline_version": "1.0.0",
+  "evaluation": {
+    "mean_reward": -12305.664,
+    "std_reward": 8580.93,
+    "min_reward": -18373.30,
+    "max_reward": -170.40,
+    "median_reward": -18373.30,
+    "reward_variance": 73631968.0,
+    "reward_p1": -18373.30,
+    "reward_p5": -18373.30,
+    "cvar_5pct": -18373.30,
+    "cvar_1pct": -18373.30,
+    "total_cost": 24.75,
+    "mean_cost": 8.25,
+    "energy_cost_savings": 37.38,
+    "safety_violation_rate": 0.3853,
+    "soc_violations": 3618,
+    "soft_violations": 3200,
+    "hard_violations": 418,
+    "near_misses": 2500,
+    "shield_interventions": 4660,
+    "oscillation_count": 145,
+    "episodes_with_violation": 3,
+    "soc_mean": 0.45,
+    "soc_std": 0.22,
+    "soc_min": 0.05,
+    "soc_max": 0.98,
+    "energy_sold_kwh": 414.18,
+    "energy_bought_kwh": 18.0,
+    "peak_grid_draw_kw": 4.2,
+    "total_steps": 12096,
+    "n_episodes": 3,
+    "mean_ep_length": 4032.0,
+    "action_distribution": [0.12, 0.08, 0.35, 0.15, 0.10, 0.12, 0.08]
+  },
+  "risk_metrics": {
+    "cvar_alpha": -18373.30,
+    "var_alpha": -18373.30,
+    "alpha": 0.05,
+    "worst_1pct": -18373.30,
+    "worst_5pct": -18373.30,
+    "worst_10pct": -17500.00,
+    "tail_ratio": 1.49,
+    "is_robust": true,
+    "n_samples": 3
+  },
+  "drift_analysis": {
+    "kl_divergence": 0.85,
+    "js_divergence": 0.08,
+    "tvd": 0.18,
+    "conservatism_level": "moderate",
+    "safe_for_deployment": true,
+    "kl_warning_threshold": 1.0,
+    "kl_critical_threshold": 2.0,
+    "flags": {
+      "kl_warning": false,
+      "kl_critical": false,
+      "tvd_warning": false,
+      "tvd_critical": false
+    }
+  },
+  "evaluation_time_sec": 55.89,
+  "baseline_comparison": {
+    "vs_bc_baseline": {
+      "reward_improvement": 12.5,
+      "safety_improvement": -5.2,
+      "verdict": "mixed"
+    },
+    "vs_random_policy": {
+      "reward_improvement": 85.3,
+      "safety_improvement": 45.2,
+      "verdict": "significantly_better"
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "algorithm": "DT",
+  "checkpoint": "models/DT/run_42/checkpoint_best.pt",
+  "timestamp": "2026-03-21T16:45:00+00:00",
+  "pipeline_version": "1.0.0",
+  "evaluation": {
+    "mean_reward": -12485.664,
+    "std_reward": 8708.21,
+    "min_reward": -18643.30,
+    "max_reward": -170.40,
+    "median_reward": -18643.30,
+    "reward_variance": 75832938.0,
+    "reward_p1": -18643.30,
+    "reward_p5": -18643.30,
+    "cvar_5pct": -18643.30,
+    "cvar_1pct": -18643.30,
+    "total_cost": 45.20,
+    "mean_cost": 15.07,
+    "energy_cost_savings": 36.52,
+    "safety_violation_rate": 0.5001,
+    "soc_violations": 3672,
+    "soft_violations": 3100,
+    "hard_violations": 572,
+    "near_misses": 3200,
+    "shield_interventions": 6048,
+    "oscillation_count": 210,
+    "episodes_with_violation": 3,
+    "soc_mean": 0.42,
+    "soc_std": 0.25,
+    "soc_min": 0.03,
+    "soc_max": 0.99,
+    "energy_sold_kwh": 544.68,
+    "energy_bought_kwh": 315.64,
+    "peak_grid_draw_kw": 4.8,
+    "total_steps": 12096,
+    "n_episodes": 3,
+    "mean_ep_length": 4032.0,
+    "action_distribution": [0.14, 0.10, 0.28, 0.18, 0.12, 0.10, 0.08],
+    "action_drift": {
+      "kl_divergence": 1.70,
+      "js_divergence": 0.107,
+      "tvd": 0.214
+    }
+  },
+  "risk_metrics": {
+    "cvar_alpha": -18643.30,
+    "var_alpha": -18643.30,
+    "alpha": 0.05,
+    "worst_1pct": -18643.30,
+    "worst_5pct": -18643.30,
+    "worst_10pct": -17800.00,
+    "tail_ratio": 1.49,
+    "is_robust": true,
+    "n_samples": 3
+  },
+  "drift_analysis": {
+    "kl_divergence": 1.70,
+    "js_divergence": 0.107,
+    "tvd": 0.214,
+    "conservatism_level": "aggressive",
+    "safe_for_deployment": false,
+    "kl_warning_threshold": 1.0,
+    "kl_critical_threshold": 2.0,
+    "flags": {
+      "kl_warning": true,
+      "kl_critical": false,
+      "tvd_warning": false,
+      "tvd_critical": false
+    }
+  },
+  "evaluation_time_sec": 299.10,
+  "baseline_comparison": {
+    "vs_bc_baseline": {
+      "reward_improvement": 10.2,
+      "safety_improvement": -12.5,
+      "verdict": "worse_on_safety"
+    },
+    "vs_cql": {
+      "reward_improvement": -1.5,
+      "safety_improvement": -29.8,
+      "verdict": "cql_preferred"
+    }
+  }
+}

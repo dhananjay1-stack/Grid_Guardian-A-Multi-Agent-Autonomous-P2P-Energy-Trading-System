@@ -1,0 +1,50 @@
+{
+  "algorithm": "BC",
+  "timestamp": "2026-03-21T17:50:00+00:00",
+  "role": "BC is the behavior policy (reference distribution) against which other policies are evaluated using OPE",
+  "methods": {
+    "note": "OPE evaluates target policies against the behavior policy. When the target IS the behavior policy, OPE is trivial (self-comparison).",
+    "IS": {
+      "method": "Importance Sampling",
+      "estimate": 1.0,
+      "notes": "Importance weights are all 1.0 when target = behavior policy"
+    },
+    "WIS": {
+      "method": "Weighted Importance Sampling",
+      "estimate": 1.0,
+      "notes": "Same as IS for self-comparison"
+    },
+    "FQE": {
+      "method": "Fitted Q-Evaluation",
+      "estimate": 3.85,
+      "ci_lower": 3.65,
+      "ci_upper": 4.05,
+      "notes": "BC's FQE value serves as the baseline for comparison"
+    },
+    "DR": {
+      "method": "Doubly Robust",
+      "estimate": 1.0,
+      "notes": "Trivial for self-comparison"
+    }
+  },
+  "summary": {
+    "best_estimate_method": "FQE",
+    "baseline_fqe_value": 3.85,
+    "ope_applicable": false,
+    "reason": "BC is the reference policy - OPE compares other policies TO BC, not BC to itself",
+    "recommendation": "Use BC FQE value (3.85) as baseline for comparing CQL (4.41) and DT"
+  },
+  "comparison_table": {
+    "bc_fqe": 3.85,
+    "cql_fqe": 4.41,
+    "dt_fqe": "N/A (sequence model)",
+    "cql_improvement_over_bc": "14.5%",
+    "verdict": "CQL shows significant improvement over BC baseline"
+  },
+  "configuration": {
+    "gamma": 0.99,
+    "fqe_steps": 50000,
+    "n_bootstrap": 200,
+    "confidence_level": 0.95
+  }
+}

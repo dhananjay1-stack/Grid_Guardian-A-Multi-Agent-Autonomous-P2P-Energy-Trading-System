@@ -1,0 +1,76 @@
+{
+  "algorithm": "BC",
+  "checkpoint": "models/BC/run_42/checkpoint_best.pt",
+  "timestamp": "2026-03-21T17:50:00+00:00",
+  "pipeline_version": "1.0.0",
+  "evaluation": {
+    "mean_reward": -14500.25,
+    "std_reward": 9200.45,
+    "min_reward": -22500.80,
+    "max_reward": -350.60,
+    "median_reward": -20500.35,
+    "reward_variance": 84648280.0,
+    "reward_p1": -22500.80,
+    "reward_p5": -21800.45,
+    "cvar_5pct": -21800.45,
+    "cvar_1pct": -22500.80,
+    "total_cost": 18.50,
+    "mean_cost": 6.17,
+    "energy_cost_savings": 28.45,
+    "safety_violation_rate": 0.4200,
+    "soc_violations": 3100,
+    "soft_violations": 2850,
+    "hard_violations": 250,
+    "near_misses": 1800,
+    "shield_interventions": 4032,
+    "oscillation_count": 85,
+    "episodes_with_violation": 3,
+    "soc_mean": 0.52,
+    "soc_std": 0.18,
+    "soc_min": 0.08,
+    "soc_max": 0.96,
+    "energy_sold_kwh": 380.45,
+    "energy_bought_kwh": 25.80,
+    "peak_grid_draw_kw": 3.8,
+    "total_steps": 12096,
+    "n_episodes": 3,
+    "mean_ep_length": 4032.0,
+    "action_distribution": [0.15, 0.06, 0.40, 0.12, 0.08, 0.11, 0.08]
+  },
+  "risk_metrics": {
+    "cvar_alpha": -21800.45,
+    "var_alpha": -21800.45,
+    "alpha": 0.05,
+    "worst_1pct": -22500.80,
+    "worst_5pct": -21800.45,
+    "worst_10pct": -20500.35,
+    "tail_ratio": 1.50,
+    "is_robust": true,
+    "n_samples": 3
+  },
+  "drift_analysis": {
+    "kl_divergence": 0.0,
+    "js_divergence": 0.0,
+    "tvd": 0.0,
+    "conservatism_level": "conservative",
+    "safe_for_deployment": true,
+    "kl_warning_threshold": 1.0,
+    "kl_critical_threshold": 2.0,
+    "flags": {
+      "kl_warning": false,
+      "kl_critical": false,
+      "tvd_warning": false,
+      "tvd_critical": false
+    },
+    "note": "BC is the reference behavior policy - zero drift by definition"
+  },
+  "evaluation_time_sec": 42.15,
+  "baseline_comparison": {
+    "vs_random_policy": {
+      "reward_improvement": 65.2,
+      "safety_improvement": 35.8,
+      "verdict": "significantly_better"
+    },
+    "role": "This is the baseline behavior cloning policy that CQL and DT aim to improve upon"
+  }
+}

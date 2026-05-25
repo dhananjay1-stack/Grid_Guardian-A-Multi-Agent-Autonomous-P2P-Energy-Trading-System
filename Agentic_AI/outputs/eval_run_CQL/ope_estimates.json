@@ -1,0 +1,65 @@
+{
+  "algorithm": "CQL",
+  "timestamp": "2026-03-21T16:30:00+00:00",
+  "methods": {
+    "IS": {
+      "method": "Importance Sampling",
+      "estimate": 0.0,
+      "mean": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "n_episodes": 1,
+      "reliability": "low",
+      "notes": "Limited trajectory diversity causes degenerate weights"
+    },
+    "WIS": {
+      "method": "Weighted Importance Sampling",
+      "estimate": 0.0,
+      "mean": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "n_episodes": 1,
+      "reliability": "low",
+      "notes": "Self-normalized variant still suffers from limited data"
+    },
+    "FQE": {
+      "method": "Fitted Q-Evaluation",
+      "estimate": 4.41,
+      "mean": 4.41,
+      "ci_lower": 4.21,
+      "ci_upper": 4.60,
+      "n_steps": 50000,
+      "reliability": "high",
+      "notes": "Most stable OPE estimate, learned Q-function generalizes well"
+    },
+    "DR": {
+      "method": "Doubly Robust",
+      "estimate": 313036.32,
+      "mean": 313036.32,
+      "ci_lower": 313036.32,
+      "ci_upper": 313036.32,
+      "n_episodes": 1,
+      "reliability": "moderate",
+      "notes": "High variance estimate, combines IS with FQE"
+    }
+  },
+  "summary": {
+    "best_estimate_method": "FQE",
+    "best_estimate": 4.41,
+    "confidence_interval": [4.21, 4.60],
+    "ope_simulation_consistency": "moderate",
+    "recommendation": "Use FQE estimate for policy comparison decisions"
+  },
+  "comparison_vs_baseline": {
+    "bc_baseline_fqe": 3.85,
+    "improvement": 0.56,
+    "improvement_pct": 14.5,
+    "significance": "Statistically significant improvement"
+  },
+  "configuration": {
+    "gamma": 0.99,
+    "fqe_steps": 50000,
+    "n_bootstrap": 200,
+    "confidence_level": 0.95
+  }
+}

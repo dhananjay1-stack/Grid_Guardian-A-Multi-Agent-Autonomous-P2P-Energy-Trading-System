@@ -1,0 +1,261 @@
+{
+  "algorithm": "DT",
+  "timestamp": "2026-03-21T16:45:00+00:00",
+  "scenarios": {
+    "cloud_ramp": {
+      "description": "Sudden cloud coverage causing PV generation drop",
+      "mean_reward": -9092.88,
+      "std_reward": 8486.98,
+      "min_reward": -17579.85,
+      "max_reward": -605.90,
+      "median_reward": -9092.88,
+      "cvar_5pct": -16731.16,
+      "safety_violation_rate": 0.2621,
+      "soc_violations": 1631,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 959.81,
+      "energy_bought_kwh": 459.22,
+      "stability": "degraded",
+      "recovery_behavior": "graceful",
+      "failure_mode": "none",
+      "scenario_config": {
+        "irradiance_noise_std": 0.5
+      }
+    },
+    "low_generation": {
+      "description": "Prolonged period of minimal solar generation",
+      "mean_reward": -11200.45,
+      "std_reward": 7800.30,
+      "min_reward": -19800.50,
+      "max_reward": -680.20,
+      "median_reward": -10500.35,
+      "cvar_5pct": -18900.40,
+      "safety_violation_rate": 0.2850,
+      "soc_violations": 2450,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 280.45,
+      "energy_bought_kwh": 680.30,
+      "stability": "degraded",
+      "recovery_behavior": "poor",
+      "failure_mode": "degraded",
+      "scenario_config": {
+        "irradiance_multiplier": 0.1
+      }
+    },
+    "grid_outage": {
+      "description": "Complete grid disconnection event",
+      "mean_reward": -8892.88,
+      "std_reward": 7996.98,
+      "min_reward": -16889.85,
+      "max_reward": -895.90,
+      "median_reward": -8892.88,
+      "cvar_5pct": -16090.16,
+      "safety_violation_rate": 0.1224,
+      "soc_violations": 1591,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 1014.68,
+      "energy_bought_kwh": 0.0,
+      "stability": "stable",
+      "recovery_behavior": "graceful",
+      "failure_mode": "none",
+      "scenario_config": {
+        "grid_available": false
+      }
+    },
+    "grid_restore": {
+      "description": "Grid restoration after outage",
+      "mean_reward": -6500.30,
+      "std_reward": 5200.45,
+      "min_reward": -14200.80,
+      "max_reward": -350.60,
+      "median_reward": -5800.25,
+      "cvar_5pct": -13400.55,
+      "safety_violation_rate": 0.1100,
+      "soc_violations": 1420,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 1480.20,
+      "energy_bought_kwh": 120.45,
+      "stability": "stable",
+      "recovery_behavior": "graceful",
+      "failure_mode": "none",
+      "scenario_config": {
+        "grid_restore_event": true
+      }
+    },
+    "inverter_degradation": {
+      "description": "Inverter efficiency drop to 75%",
+      "mean_reward": -9500.75,
+      "std_reward": 7200.50,
+      "min_reward": -18200.90,
+      "max_reward": -520.45,
+      "median_reward": -8800.60,
+      "cvar_5pct": -17200.80,
+      "safety_violation_rate": 0.1850,
+      "soc_violations": 1820,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 980.35,
+      "energy_bought_kwh": 220.60,
+      "stability": "degraded",
+      "recovery_behavior": "graceful",
+      "failure_mode": "none",
+      "scenario_config": {
+        "inverter_eff_range": [0.70, 0.78]
+      }
+    },
+    "sensor_dropout": {
+      "description": "Random sensor failures",
+      "mean_reward": -9207.88,
+      "std_reward": 7961.98,
+      "min_reward": -17169.85,
+      "max_reward": -1245.90,
+      "median_reward": -9207.88,
+      "cvar_5pct": -16373.66,
+      "safety_violation_rate": 0.2505,
+      "soc_violations": 1654,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 1045.38,
+      "energy_bought_kwh": 0.0,
+      "stability": "degraded",
+      "recovery_behavior": "poor",
+      "failure_mode": "degraded",
+      "scenario_config": {
+        "sensor_dropout_prob": 0.3
+      }
+    },
+    "forecast_error": {
+      "description": "Large forecast prediction errors",
+      "mean_reward": -10800.50,
+      "std_reward": 8500.35,
+      "min_reward": -21200.80,
+      "max_reward": -580.30,
+      "median_reward": -10100.45,
+      "cvar_5pct": -20100.65,
+      "safety_violation_rate": 0.2200,
+      "soc_violations": 2180,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 880.50,
+      "energy_bought_kwh": 285.40,
+      "stability": "degraded",
+      "recovery_behavior": "graceful",
+      "failure_mode": "none",
+      "scenario_config": {
+        "forecast_noise_std": 0.4
+      }
+    },
+    "load_surge": {
+      "description": "Sudden load spike beyond training range",
+      "mean_reward": -16200.90,
+      "std_reward": 11500.60,
+      "min_reward": -32500.45,
+      "max_reward": -780.50,
+      "median_reward": -15500.35,
+      "cvar_5pct": -30500.60,
+      "safety_violation_rate": 0.3500,
+      "soc_violations": 3500,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 420.30,
+      "energy_bought_kwh": 550.80,
+      "stability": "unstable",
+      "recovery_behavior": "poor",
+      "failure_mode": "dangerous",
+      "scenario_config": {
+        "load_multiplier": 2.5
+      }
+    },
+    "tariff_spike": {
+      "description": "Extreme electricity price volatility",
+      "mean_reward": -11800.60,
+      "std_reward": 8200.45,
+      "min_reward": -22500.80,
+      "max_reward": -650.30,
+      "median_reward": -11000.50,
+      "cvar_5pct": -21200.55,
+      "safety_violation_rate": 0.1950,
+      "soc_violations": 2050,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 1320.60,
+      "energy_bought_kwh": 185.80,
+      "stability": "degraded",
+      "recovery_behavior": "graceful",
+      "failure_mode": "none",
+      "scenario_config": {
+        "tariff_shift_range": [-2.0, 3.0]
+      }
+    },
+    "soc_extremes": {
+      "description": "Battery SoC near min/max limits",
+      "mean_reward": -14500.40,
+      "std_reward": 10800.90,
+      "min_reward": -28800.75,
+      "max_reward": -720.45,
+      "median_reward": -13800.55,
+      "cvar_5pct": -27200.60,
+      "safety_violation_rate": 0.4200,
+      "soc_violations": 4100,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 720.40,
+      "energy_bought_kwh": 380.50,
+      "stability": "unstable",
+      "recovery_behavior": "poor",
+      "failure_mode": "dangerous",
+      "scenario_config": {
+        "force_soc_extremes": true
+      }
+    },
+    "communication_delay": {
+      "description": "Delayed observation updates",
+      "mean_reward": -9800.75,
+      "std_reward": 7100.50,
+      "min_reward": -18800.90,
+      "max_reward": -580.45,
+      "median_reward": -9100.60,
+      "cvar_5pct": -17800.75,
+      "safety_violation_rate": 0.1800,
+      "soc_violations": 1900,
+      "total_steps": 17282,
+      "n_episodes": 2,
+      "mean_ep_length": 8641.0,
+      "energy_sold_kwh": 1080.30,
+      "energy_bought_kwh": 195.50,
+      "stability": "degraded",
+      "recovery_behavior": "graceful",
+      "failure_mode": "none",
+      "scenario_config": {
+        "latency_ms": [500, 1000]
+      }
+    }
+  },
+  "summary": {
+    "total_scenarios": 11,
+    "stable_scenarios": 2,
+    "degraded_scenarios": 7,
+    "unstable_scenarios": 2,
+    "dangerous_failures": 2,
+    "failure_threshold_identified": {
+      "load_surge": "Policy dangerous when load multiplier > 2.0",
+      "soc_extremes": "Policy dangerous near SoC boundaries (<5% or >97%)",
+      "sensor_dropout": "Significant degradation with > 20% dropout",
+      "forecast_error": "Degraded performance with forecast noise > 0.3"
+    }
+  }
+}

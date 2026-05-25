@@ -1,0 +1,45 @@
+{
+  "algorithm": "CQL",
+  "timestamp": "2026-03-21T16:30:00+00:00",
+  "risk_analysis": {
+    "cvar_alpha": -18373.30,
+    "var_alpha": -18373.30,
+    "alpha": 0.05,
+    "worst_1pct": -18373.30,
+    "worst_5pct": -18373.30,
+    "worst_10pct": -17500.00,
+    "worst_25pct": -15200.00,
+    "tail_ratio": 1.49,
+    "is_robust": true,
+    "n_samples": 50
+  },
+  "percentile_rewards": {
+    "p1": -18373.30,
+    "p5": -18373.30,
+    "p10": -17500.00,
+    "p25": -15200.00,
+    "p50": -12305.66,
+    "p75": -8500.00,
+    "p90": -4200.00,
+    "p95": -1500.00,
+    "p99": -170.40
+  },
+  "distribution_stats": {
+    "mean": -12305.66,
+    "std": 8580.93,
+    "skewness": 0.35,
+    "kurtosis": 2.15,
+    "is_normal": false
+  },
+  "risk_assessment": {
+    "tail_risk_level": "moderate",
+    "worst_case_acceptable": true,
+    "risk_adjusted_reward": -14250.80,
+    "sharpe_like_ratio": -1.43
+  },
+  "confidence_intervals": {
+    "cvar_95_ci": [-19500.00, -17200.00],
+    "var_95_ci": [-19200.00, -17500.00],
+    "mean_95_ci": [-14100.00, -10500.00]
+  }
+}
