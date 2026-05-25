@@ -1,5 +1,5 @@
 node_modules/
-artifacts/0
+artifacts/
 cache/
 typechain-types/
 .env
