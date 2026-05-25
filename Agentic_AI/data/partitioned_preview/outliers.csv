@@ -1,6 +1,0 @@
-column,method,n_outliers,lo_bound,hi_bound
-pv_gen_kw,iqr,4753,-1.7098,2.2798
-load_kw,iqr,120,-0.9876,1.9059
-net_kw,iqr,2752,-2.5841,2.2495
-battery_power_kw,iqr,21918,-0.5809,0.4357
-reward,iqr,3285,-0.3748,0.2445

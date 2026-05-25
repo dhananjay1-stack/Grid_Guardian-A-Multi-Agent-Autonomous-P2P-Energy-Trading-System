@@ -1,8 +1,0 @@
-{
-  "config_hash": "4296556e7b59cc9b1a81289be4ba8603751c65596399f646a602316ee6a1442f",
-  "seed": 42,
-  "script_version": "1.0.0",
-  "git_commit": null,
-  "commit_hash_format": "sha256(f\"{ts}|{household_id}|{offered_kwh:.6f}|{salt_hex}\")",
-  "generated_utc": "2026-02-27T19:49:53.218011+00:00"
-}
