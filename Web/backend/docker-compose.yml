@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: gridguardian-db
+    environment:
+      POSTGRES_USER: grid
+      POSTGRES_PASSWORD: guardian
+      POSTGRES_DB: grid_guardian
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grid -d grid_guardian"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (for caching and sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: gridguardian-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MQTT Broker (Mosquitto)
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: gridguardian-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mqttdata:/mosquitto/data
+      - mqttlog:/mosquitto/log
+
+  # MongoDB Database
+  mongo:
+    image: mongo:6.0
+    container_name: gridguardian-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  # Backend Service (development)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gridguardian-backend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      MONGO_URI: mongodb://mongo:27017/gridguardian
+      DATABASE_URL: postgresql://grid:guardian@db:5432/grid_guardian
+      REDIS_URL: redis://redis:6379
+      MQTT_BROKER_URL: mqtt://mqtt:1883
+      RPC_URL: ${RPC_URL:-http://host.docker.internal:8545}
+      CHAIN_ID: ${CHAIN_ID:-31337}
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      IDENTITY_SC_ADDRESS: ${IDENTITY_SC_ADDRESS:-}
+      COLLATERAL_SC_ADDRESS: ${COLLATERAL_SC_ADDRESS:-}
+      TRADING_SC_ADDRESS: ${TRADING_SC_ADDRESS:-}
+      MATCH_REGISTRY_ADDRESS: ${MATCH_REGISTRY_ADDRESS:-}
+      SETTLEMENT_SC_ADDRESS: ${SETTLEMENT_SC_ADDRESS:-}
+      DELIVERY_REGISTRY_ADDRESS: ${DELIVERY_REGISTRY_ADDRESS:-}
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ../../Agentic_AI/edge/policy_pack:/app/models:ro
+    depends_on:
+      mongo:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  pgdata:
+  mongodata:
+  mqttdata:
+  mqttlog:

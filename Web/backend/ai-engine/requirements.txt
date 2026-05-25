@@ -1,0 +1,7 @@
+# AI Decision Engine Server Requirements
+flask>=2.0.0
+flask-cors>=3.0.0
+numpy>=1.21.0
+torch>=2.0.0
+onnxruntime>=1.14.0
+gunicorn>=21.0.0

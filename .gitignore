@@ -30,3 +30,10 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
+
+# Web specific
+.next/
+logs/
+*.log
+.env.local
+*.tsbuildinfo
